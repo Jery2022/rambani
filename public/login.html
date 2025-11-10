@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connexion au Chat</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Inter', sans-serif;
+            background-color: #3f51b5; /* Couleur de fond similaire à l'en-tête du chat */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: #333;
+        }
+        .login-container {
+            background-color: white;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+        .login-container h1 {
+            color: #3f51b5;
+            margin-bottom: 30px;
+            font-size: 2rem;
+        }
+        .input-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #555;
+        }
+        .input-group input {
+            width: calc(100% - 20px);
+            padding: 12px 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 1rem;
+        }
+        .input-group input:focus {
+            outline: 2px solid #3f51b5;
+            border-color: transparent;
+        }
+        .login-button {
+            background-color: #4CAF50; /* Vert pour le bouton de connexion */
+            color: white;
+            padding: 12px 25px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1.1rem;
+            font-weight: bold;
+            transition: background-color 0.2s;
+            width: 100%;
+        }
+        .login-button:hover {
+            background-color: #45a049;
+        }
+        .error-message {
+            color: #f44336;
+            margin-top: 15px;
+            font-weight: bold;
+            display: none; /* Caché par défaut */
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <h1>Connexion</h1>
+        <form id="login-form">
+            <div class="input-group">
+                <label for="username">Pseudo</label>
+                <input type="text" id="username" name="username" required>
+            </div>
+            <div class="input-group">
+                <label for="password">Mot de passe</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            <button type="submit" class="login-button">Se connecter</button>
+            <p class="error-message" id="error-message"></p>
+        </form>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const loginForm = document.getElementById('login-form');
+            const errorMessage = document.getElementById('error-message');
+
+            loginForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                errorMessage.style.display = 'none'; // Cacher les messages d'erreur précédents
+
+                const username = document.getElementById('username').value;
+                const password = document.getElementById('password').value;
+
+                try {
+                    const response = await fetch('/login', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ username, password })
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        // Connexion réussie, rediriger vers la page de chat
+                        window.location.href = '/';
+                    } else {
+                        // Afficher le message d'erreur du serveur
+                        errorMessage.textContent = data.message || 'Erreur de connexion.';
+                        errorMessage.style.display = 'block';
+                    }
+                } catch (error) {
+                    console.error('Erreur lors de la requête de connexion:', error);
+                    errorMessage.textContent = 'Une erreur est survenue. Veuillez réessayer.';
+                    errorMessage.style.display = 'block';
+                }
+            });
+        });
+    </script>
+</body>
+</html>
