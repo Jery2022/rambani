@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modifier l'utilisateur</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .edit-container {
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            width: 400px;
+            text-align: center;
+        }
+        .edit-container h2 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+        .edit-container label {
+            display: block;
+            text-align: left;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .edit-container input[type="text"],
+        .edit-container input[type="password"],
+        .edit-container select {
+            width: calc(100% - 20px);
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .edit-container button {
+            width: 100%;
+            padding: 10px;
+            background-color: #28a745;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+        .edit-container button:hover {
+            background-color: #218838;
+        }
+        .edit-container .back-button {
+            background-color: #6c757d;
+            margin-top: 10px;
+        }
+        .edit-container .back-button:hover {
+            background-color: #5a6268;
+        }
+    </style>
+</head>
+<body>
+    <div class="edit-container">
+        <h2>Modifier l'utilisateur</h2>
+        <form id="editUserForm">
+            <input type="hidden" id="userId" name="id">
+            <label for="username">Nom d'utilisateur:</label>
+            <input type="text" id="username" name="username" required>
+
+            <label for="password">Nouveau mot de passe (laisser vide pour ne pas changer):</label>
+            <input type="password" id="password" name="password">
+
+            <label for="role">Rôle:</label>
+            <select id="role" name="role" required>
+                <option value="user">Utilisateur</option>
+                <option value="admin">Administrateur</option>
+            </select>
+
+            <button type="submit">Mettre à jour</button>
+            <button type="button" class="back-button" onclick="window.location.href='/admin'">Retour à l'administration</button>
+        </form>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const userId = urlParams.get('id');
+
+            if (!userId) {
+                alert('ID utilisateur manquant.');
+                window.location.href = '/admin';
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/admin/users/${userId}`);
+                if (!response.ok) {
+                    throw new Error('Utilisateur non trouvé ou erreur serveur.');
+                }
+                const user = await response.json();
+
+                document.getElementById('userId').value = user._id;
+                document.getElementById('username').value = user.username;
+                document.getElementById('role').value = user.role;
+
+            } catch (error) {
+                console.error('Erreur lors du chargement des données utilisateur:', error);
+                alert('Erreur lors du chargement des données utilisateur: ' + error.message);
+                window.location.href = '/admin';
+            }
+
+            document.getElementById('editUserForm').addEventListener('submit', async (event) => {
+                event.preventDefault();
+
+                const formData = new FormData(event.target);
+                const data = Object.fromEntries(formData.entries());
+
+                // Supprimer le mot de passe s'il est vide pour ne pas le modifier
+                if (data.password === '') {
+                    delete data.password;
+                }
+
+                try {
+                    const response = await fetch(`/api/admin/users/${userId}`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(data)
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.message || 'Erreur lors de la mise à jour de l\'utilisateur.');
+                    }
+
+                    alert('Utilisateur mis à jour avec succès!');
+                    window.location.href = '/admin';
+
+                } catch (error) {
+                    console.error('Erreur lors de la mise à jour:', error);
+                    alert('Erreur lors de la mise à jour: ' + error.message);
+                }
+            });
+        });
+    </script>
+</body>
+</html>

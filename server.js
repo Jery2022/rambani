@@ -3,6 +3,9 @@ const { createServer } = require('http');
 const { Server } = require('socket.io');
 const { MongoClient } = require('mongodb');
 const path = require('path');
+const bcrypt = require('bcrypt');
+const session = require('express-session');
+const MongoStore = require('connect-mongo'); // Importer connect-mongo
 
 // --- Configuration du Serveur et de la Base de Données ---
 
@@ -12,6 +15,7 @@ const PORT = process.env.PORT || 3000;
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/chat_db';
 const DB_NAME = 'chat_db';
 const COLLECTION_NAME = 'messages';
+const USERS_COLLECTION_NAME = 'users'; // Collection pour les utilisateurs
 
 const app = express();
 const httpServer = createServer(app);
@@ -24,27 +28,299 @@ methods: ["GET", "POST"]
 }
 });
 
+// Middleware pour parser le JSON dans les requêtes
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Configuration de la session
+const sessionMiddleware = session({
+    secret: 'super_secret_key_for_chat_app', // Remplacez par une clé secrète forte et unique
+    resave: false,
+    saveUninitialized: false,
+    store: MongoStore.create({
+        mongoUrl: MONGODB_URI, // Utiliser mongoUrl directement
+        dbName: DB_NAME,
+        collectionName: 'sessions',
+        ttl: 14 * 24 * 60 * 60 // = 14 jours. Par défaut
+    }),
+    cookie: { secure: false, sameSite: 'lax' } // Mettre à true si vous utilisez HTTPS, et sameSite à 'lax'
+});
+
+app.use(sessionMiddleware);
+
 let db; // Variable pour stocker l'objet de la base de données MongoDB
+let mongoClientInstance; // Variable pour stocker l'instance du client MongoDB
 
 // Utiliser un Set pour garantir l'unicité des IDs d'utilisateur connectés
 const connectedUsers = new Set();
 
-// Middleware pour servir les fichiers statiques (index.html) depuis le dossier 'public'
+// Middleware pour servir les fichiers statiques depuis le dossier 'public'
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Route simple pour la page d'accueil
-app.get('/', (req, res) => {
+// Middleware pour vérifier l'authentification
+function isAuthenticated(req, res, next) {
+    if (req.session.user) {
+        next();
+    } else {
+        // Si la requête est pour une route d'administration, rediriger vers la page de connexion admin
+        if (req.path.startsWith('/admin')) {
+            res.redirect('/admin/login');
+        } else {
+            res.redirect('/login.html'); // Rediriger vers la page de connexion publique si non authentifié
+        }
+    }
+}
 
-//    'index.html' dans le répertoire 'public'
-res.sendFile(path.join(__dirname, 'public', 'index.html'));
+// Route pour la page de connexion
+app.get('/login.html', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'login.html'));
+});
+
+// Route pour la page d'accueil (chat), protégée par l'authentification
+app.get('/', isAuthenticated, (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Route pour la page de connexion de l'administration
+app.get('/admin/login', (req, res) => {
+    res.sendFile(path.join(__dirname, 'src', 'admin', 'login.html'));
+});
+
+// Route de déconnexion
+app.get('/logout', (req, res) => {
+    req.session.destroy(err => {
+        if (err) {
+            return res.redirect('/');
+        }
+        res.clearCookie('connect.sid'); // Supprime le cookie de session
+        res.redirect('/login.html');
+    });
+});
+
+// Route d'enregistrement (pour les tests ou si l'utilisateur souhaite une fonctionnalité d'enregistrement)
+app.post('/register', async (req, res) => {
+    const { username, password } = req.body;
+
+    if (!username || !password) {
+        return res.status(400).json({ message: 'Pseudo et mot de passe sont requis.' });
+    }
+
+    try {
+        const usersCollection = db.collection(USERS_COLLECTION_NAME);
+        const existingUser = await usersCollection.findOne({ username });
+
+        if (existingUser) {
+            return res.status(409).json({ message: 'Ce pseudo est déjà pris.' });
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 10); // Hacher le mot de passe
+        await usersCollection.insertOne({ username, password: hashedPassword, role: 'user' }); // Rôle par défaut 'user'
+
+        res.status(201).json({ message: 'Utilisateur enregistré avec succès.' });
+    } catch (error) {
+        console.error('Erreur lors de l\'enregistrement:', error);
+        res.status(500).json({ message: 'Erreur serveur lors de l\'enregistrement.' });
+    }
+});
+
+// Route de connexion
+app.post('/login', async (req, res) => {
+    const { username, password } = req.body;
+
+    if (!username || !password) {
+        return res.status(400).json({ message: 'Pseudo et mot de passe sont requis.' });
+    }
+
+    try {
+        const usersCollection = db.collection(USERS_COLLECTION_NAME);
+        const user = await usersCollection.findOne({ username });
+
+        if (!user) {
+            return res.status(401).json({ message: 'Pseudo ou mot de passe incorrect.' });
+        }
+
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+
+        if (!isPasswordValid) {
+            return res.status(401).json({ message: 'Pseudo ou mot de passe incorrect.' });
+        }
+
+        req.session.user = { id: user._id.toString(), username: user.username, role: user.role }; // Stocker l'utilisateur et son rôle dans la session
+        res.status(200).json({ message: 'Connexion réussie.', username: user.username, role: user.role });
+    } catch (error) {
+        console.error('Erreur lors de la connexion:', error);
+        res.status(500).json({ message: 'Erreur serveur lors de la connexion.' });
+    }
+});
+
+// Middleware pour vérifier si l'utilisateur est un administrateur
+function isAdmin(req, res, next) {
+    if (req.session.user && req.session.user.role === 'admin') {
+        next();
+    } else {
+        // Rediriger vers la page de connexion admin si non authentifié ou non admin
+        res.redirect('/admin/login');
+    }
+}
+
+// Route pour la page d'administration, protégée par l'authentification et le rôle d'administrateur
+app.get('/admin', isAuthenticated, isAdmin, (req, res) => {
+    res.sendFile(path.join(__dirname, 'src', 'admin', 'index.html'));
+});
+
+// Route de connexion pour l'administration
+app.post('/admin/login', async (req, res) => {
+    const { username, password } = req.body;
+
+    if (!username || !password) {
+        return res.status(400).send('Pseudo et mot de passe sont requis.');
+    }
+
+    try {
+        const usersCollection = db.collection(USERS_COLLECTION_NAME);
+        const user = await usersCollection.findOne({ username });
+
+        if (!user) {
+            return res.status(401).send('Pseudo ou mot de passe incorrect.');
+        }
+
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+
+        if (!isPasswordValid) {
+            return res.status(401).send('Pseudo ou mot de passe incorrect.');
+        }
+
+        if (user.role !== 'admin') {
+            return res.status(403).send('Accès refusé. Seuls les administrateurs peuvent se connecter ici.');
+        }
+
+        req.session.user = { id: user._id.toString(), username: user.username, role: user.role };
+        console.log('Admin login successful, session user:', req.session.user);
+        res.redirect('/admin'); // Rediriger vers la page d'administration
+    } catch (error) {
+        console.error('Erreur lors de la connexion admin:', error);
+        res.status(500).send('Erreur serveur lors de la connexion.');
+    }
+});
+
+// API pour lister les utilisateurs (accessible uniquement aux administrateurs)
+app.get('/api/admin/users', isAdmin, async (req, res) => {
+    try {
+        const usersCollection = db.collection(USERS_COLLECTION_NAME);
+        const users = await usersCollection.find({}, { projection: { password: 0 } }).toArray(); // Exclure les mots de passe
+        res.status(200).json(users);
+    } catch (error) {
+        console.error('Erreur lors de la récupération des utilisateurs:', error);
+        res.status(500).json({ message: 'Erreur serveur lors de la récupération des utilisateurs.' });
+    }
+});
+
+// API pour enregistrer un nouvel utilisateur (accessible uniquement aux administrateurs)
+app.post('/api/admin/users', isAdmin, async (req, res) => {
+    const { username, password, role } = req.body;
+
+    if (!username || !password || !role) {
+        return res.status(400).json({ message: 'Pseudo, mot de passe et rôle sont requis.' });
+    }
+
+    try {
+        const usersCollection = db.collection(USERS_COLLECTION_NAME);
+        const existingUser = await usersCollection.findOne({ username });
+
+        if (existingUser) {
+            return res.status(409).json({ message: 'Ce pseudo est déjà pris.' });
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+        await usersCollection.insertOne({ username, password: hashedPassword, role });
+
+        res.status(201).json({ message: 'Utilisateur enregistré avec succès.' });
+    } catch (error) {
+        console.error('Erreur lors de l\'enregistrement d\'un utilisateur par l\'admin:', error);
+        res.status(500).json({ message: 'Erreur serveur lors de l\'enregistrement de l\'utilisateur.' });
+    }
+});
+
+// API pour supprimer un utilisateur (accessible uniquement aux administrateurs)
+app.delete('/api/admin/users/:id', isAdmin, async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        const usersCollection = db.collection(USERS_COLLECTION_NAME);
+        const result = await usersCollection.deleteOne({ _id: new MongoClient.ObjectId(id) });
+
+        if (result.deletedCount === 0) {
+            return res.status(404).json({ message: 'Utilisateur non trouvé.' });
+        }
+
+        res.status(200).json({ message: 'Utilisateur supprimé avec succès.' });
+    } catch (error) {
+        console.error('Erreur lors de la suppression d\'un utilisateur:', error);
+        res.status(500).json({ message: 'Erreur serveur lors de la suppression de l\'utilisateur.' });
+    }
+});
+
+// Route pour la page de modification d'utilisateur
+app.get('/admin/edit-user', isAuthenticated, isAdmin, (req, res) => {
+    res.sendFile(path.join(__dirname, 'src', 'admin', 'edit-user.html'));
+});
+
+// API pour récupérer un utilisateur par son ID (pour le formulaire de modification)
+app.get('/api/admin/users/:id', isAuthenticated, isAdmin, async (req, res) => {
+    const { id } = req.params;
+    try {
+        const usersCollection = db.collection(USERS_COLLECTION_NAME);
+        const user = await usersCollection.findOne({ _id: new MongoClient.ObjectId(id) }, { projection: { password: 0 } });
+        if (!user) {
+            return res.status(404).json({ message: 'Utilisateur non trouvé.' });
+        }
+        res.status(200).json(user);
+    } catch (error) {
+        console.error('Erreur lors de la récupération de l\'utilisateur:', error);
+        res.status(500).json({ message: 'Erreur serveur lors de la récupération de l\'utilisateur.' });
+    }
+});
+
+// API pour modifier un utilisateur (accessible uniquement aux administrateurs)
+app.put('/api/admin/users/:id', isAuthenticated, isAdmin, async (req, res) => {
+    const { id } = req.params;
+    const { username, password, role } = req.body;
+
+    if (!username || !role) {
+        return res.status(400).json({ message: 'Pseudo et rôle sont requis.' });
+    }
+
+    try {
+        const usersCollection = db.collection(USERS_COLLECTION_NAME);
+        const updateData = { username, role };
+
+        if (password) {
+            updateData.password = await bcrypt.hash(password, 10);
+        }
+
+        const result = await usersCollection.updateOne(
+            { _id: new MongoClient.ObjectId(id) },
+            { $set: updateData }
+        );
+
+        if (result.matchedCount === 0) {
+            return res.status(404).json({ message: 'Utilisateur non trouvé.' });
+        }
+
+        res.status(200).json({ message: 'Utilisateur mis à jour avec succès.' });
+    } catch (error) {
+        console.error('Erreur lors de la mise à jour de l\'utilisateur:', error);
+        res.status(500).json({ message: 'Erreur serveur lors de la mise à jour de l\'utilisateur.' });
+    }
 });
 
 // Fonction pour se connecter à MongoDB
 async function connectDB() {
     try {
             console.log('Tentative de connexion à MongoDB...');
-            const client = await MongoClient.connect(MONGODB_URI);
-            db = client.db(DB_NAME);
+            mongoClientInstance = await MongoClient.connect(MONGODB_URI); // Stocker l'instance du client
+            db = mongoClientInstance.db(DB_NAME);
+            
             console.log('Connexion à MongoDB réussie ! Base de données :', DB_NAME);
             // Démarrer le serveur HTTP seulement après la connexion à la DB
             startServer();
@@ -55,11 +331,27 @@ async function connectDB() {
     }
 }
 
+// Middleware pour servir les fichiers statiques du dossier 'src/admin'
+app.use('/admin', express.static(path.join(__dirname, 'src', 'admin')));
+
 // Fonction pour démarrer le serveur Socket.IO
 function startServer() {
+    io.use((socket, next) => {
+        // Récupérer la session Express dans le contexte Socket.IO
+        sessionMiddleware(socket.request, {}, () => { // Utiliser la même instance de middleware de session
+            if (socket.request.session && socket.request.session.user) {
+                socket.request.user = socket.request.session.user; // Attacher l'utilisateur à l'objet socket.request
+                next();
+            } else {
+                next(new Error('Non autorisé')); // Refuser la connexion Socket.IO si non authentifié
+            }
+        });
+    });
+
     io.on('connection', async (socket) => {
-    // Définir un userId court
-    const userId = socket.id.substring(0, 4);
+    const user = socket.request.user; // Récupérer l'utilisateur authentifié
+    const userId = user.username; // Utiliser le pseudo comme ID utilisateur
+
     connectedUsers.add(userId);
 
     console.log(`Utilisateur connecté: ${userId} (${socket.id})`);
@@ -94,6 +386,9 @@ function startServer() {
     
     // Mettre à jour et diffuser la liste des utilisateurs à tous
     broadcastUserList();
+
+    // Envoyer l'ID de l'utilisateur actuel au client pour affichage
+    socket.emit('current user', userId);
 
     // 2. Écouter les nouveaux messages
     socket.on('chat message', async (msg) => {

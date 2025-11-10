@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Administration du Chat</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f7f7;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            color: #333;
+        }
+        header {
+            background-color: #3f51b5;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        header h1 {
+            margin: 0;
+            font-size: 2.2rem;
+        }
+        .container {
+            flex-grow: 1;
+            padding: 20px;
+            max-width: 900px;
+            margin: 20px auto;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        h2 {
+            color: #3f51b5;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+            margin-top: 30px;
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+        .form-group label {
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        .form-group input[type="text"],
+        .form-group input[type="password"],
+        .form-group select {
+            width: calc(100% - 22px);
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 1rem;
+        }
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: 2px solid #3f51b5;
+            border-color: transparent;
+        }
+        .btn {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: bold;
+            transition: background-color 0.2s;
+            margin-top: 10px;
+        }
+        .btn:hover {
+            background-color: #45a049;
+        }
+        .btn-danger {
+            background-color: #f44336;
+        }
+        .btn-danger:hover {
+            background-color: #d32f2f;
+        }
+        .message {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 4px;
+            font-weight: bold;
+            display: none;
+        }
+        .message.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .message.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+            color: #3f51b5;
+        }
+        .action-buttons button {
+            margin-right: 5px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Panneau d'Administration du Chat</h1>
+    </header>
+
+    <div class="container">
+        <h2>Enregistrer un nouvel utilisateur</h2>
+        <form id="register-form">
+            <div class="form-group">
+                <label for="reg-username">Pseudo</label>
+                <input type="text" id="reg-username" required>
+            </div>
+            <div class="form-group">
+                <label for="reg-password">Mot de passe</label>
+                <input type="password" id="reg-password" required>
+            </div>
+            <div class="form-group">
+                <label for="reg-role">Rôle</label>
+                <select id="reg-role" required>
+                    <option value="user">Utilisateur</option>
+                    <option value="admin">Administrateur</option>
+                </select>
+            </div>
+            <button type="submit" class="btn">Enregistrer</button>
+            <div id="register-message" class="message"></div>
+        </form>
+
+        <h2>Liste des utilisateurs</h2>
+        <div id="users-message" class="message"></div>
+        <table id="users-table">
+            <thead>
+                <tr>
+                    <th>Pseudo</th>
+                    <th>Rôle</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Les utilisateurs seront chargés ici par JS -->
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const registerForm = document.getElementById('register-form');
+            const regUsernameInput = document.getElementById('reg-username');
+            const regPasswordInput = document.getElementById('reg-password');
+            const regRoleSelect = document.getElementById('reg-role');
+            const registerMessage = document.getElementById('register-message');
+            const usersTableBody = document.querySelector('#users-table tbody');
+            const usersMessage = document.getElementById('users-message');
+
+            // Fonction pour afficher les messages
+            function showMessage(element, msg, type) {
+                element.textContent = msg;
+                element.className = `message ${type}`;
+                element.style.display = 'block';
+                setTimeout(() => {
+                    element.style.display = 'none';
+                }, 5000);
+            }
+
+            // Fonction pour charger les utilisateurs
+            async function loadUsers() {
+                try {
+                    const response = await fetch('/api/admin/users');
+                    if (!response.ok) {
+                        throw new Error('Échec du chargement des utilisateurs.');
+                    }
+                    const users = await response.json();
+                    usersTableBody.innerHTML = ''; // Vider la table
+                    if (users.length === 0) {
+                        usersTableBody.innerHTML = '<tr><td colspan="3">Aucun utilisateur enregistré.</td></tr>';
+                        return;
+                    }
+                    users.forEach(user => {
+                        const row = usersTableBody.insertRow();
+                        row.insertCell().textContent = user.username;
+                        row.insertCell().textContent = user.role;
+                        const actionsCell = row.insertCell();
+                        const editButton = document.createElement('button');
+                        editButton.textContent = 'Modifier';
+                        editButton.className = 'btn';
+                        editButton.style.backgroundColor = '#17a2b8'; /* Info blue */
+                        editButton.style.marginRight = '5px';
+                        editButton.addEventListener('click', () => window.location.href = `/admin/edit-user?id=${user._id}`);
+                        actionsCell.appendChild(editButton);
+
+                        const deleteButton = document.createElement('button');
+                        deleteButton.textContent = 'Supprimer';
+                        deleteButton.className = 'btn btn-danger';
+                        deleteButton.addEventListener('click', () => deleteUser(user._id, user.username));
+                        actionsCell.appendChild(deleteButton);
+                    });
+                } catch (error) {
+                    console.error('Erreur lors du chargement des utilisateurs:', error);
+                    showMessage(usersMessage, error.message, 'error');
+                }
+            }
+
+            // Fonction pour supprimer un utilisateur
+            async function deleteUser(userId, username) {
+                if (!confirm(`Êtes-vous sûr de vouloir supprimer l'utilisateur "${username}" (ID: ${userId}) ?`)) {
+                    return;
+                }
+                try {
+                    const response = await fetch(`/api/admin/users/${userId}`, {
+                        method: 'DELETE'
+                    });
+                    const data = await response.json();
+                    if (response.ok) {
+                        showMessage(usersMessage, data.message, 'success');
+                        loadUsers(); // Recharger la liste après suppression
+                    } else {
+                        showMessage(usersMessage, data.message || 'Erreur lors de la suppression.', 'error');
+                    }
+                } catch (error) {
+                    console.error('Erreur lors de la suppression:', error);
+                    showMessage(usersMessage, 'Une erreur est survenue lors de la suppression.', 'error');
+                }
+            }
+
+            // Gérer l'enregistrement d'un nouvel utilisateur
+            registerForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const username = regUsernameInput.value;
+                const password = regPasswordInput.value;
+                const role = regRoleSelect.value;
+
+                try {
+                    const response = await fetch('/api/admin/users', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ username, password, role })
+                    });
+                    const data = await response.json();
+                    if (response.ok) {
+                        showMessage(registerMessage, data.message, 'success');
+                        regUsernameInput.value = '';
+                        regPasswordInput.value = '';
+                        regRoleSelect.value = 'user';
+                        loadUsers(); // Recharger la liste après enregistrement
+                    } else {
+                        showMessage(registerMessage, data.message || 'Erreur lors de l\'enregistrement.', 'error');
+                    }
+                } catch (error) {
+                    console.error('Erreur lors de l\'enregistrement:', error);
+                    showMessage(registerMessage, 'Une erreur est survenue lors de l\'enregistrement.', 'error');
+                }
+            });
+
+            // Charger les utilisateurs au démarrage
+            loadUsers();
+        });
+    </script>
+</body>
+</html>

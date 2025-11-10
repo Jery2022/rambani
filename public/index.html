@@ -398,6 +398,13 @@
             let currentUserId = null; // Variable pour stocker l'ID local
             let unreadMessagesCount = 0; // Compteur de messages non lus
 
+            // Gérer la réception de l'ID utilisateur actuel du serveur
+            socket.on('current user', function(username) {
+                currentUserId = username;
+                myUserIdSpan.textContent = currentUserId + " (Moi)";
+                myAvatarDiv.textContent = currentUserId.charAt(0).toUpperCase();
+            });
+
             // Fonction utilitaire pour mettre à jour le badge de messages non lus
             function updateUnreadMessagesBadge() {
                 if (unreadMessagesCount > 0) {
@@ -432,14 +439,8 @@
             
             // Fonction utilitaire pour mettre à jour la liste des utilisateurs
             function updateUsersList(users) {
-                // Détermine l'ID de l'utilisateur actuel
-                if (!currentUserId) {
-                    // Le serveur utilise les 4 premiers caractères de l'ID socket comme ID utilisateur
-                    currentUserId = socket.id ? socket.id.substring(0, 4) : 'Moi';
-                    myUserIdSpan.textContent = currentUserId + " (Moi)";
-                    myAvatarDiv.textContent = currentUserId.charAt(0);
-                }
-
+                // L'ID utilisateur est maintenant défini par le serveur via l'événement 'current user'
+                // Cette section n'a plus besoin de générer un ID local
                 usersList.innerHTML = ''; // Vide la liste
                 
                 // Filtre l'utilisateur actuel et n'affiche que les autres
@@ -519,16 +520,8 @@
                 // Logique de déconnexion si l'utilisateur confirme
                 confirmationModal.style.display = 'none';
                 
-                // Demande au serveur de fermer le socket
-                socket.disconnect(); 
-                
-                // Afficher le message de déconnexion
-                document.getElementById('main-container').innerHTML = `
-                    <div style="text-align: center; padding: 50px; background-color: #f7f7f7; height: 100vh;">
-                        <h2 style="color: #f44336;"><i class="fa-solid fa-circle-xmark"></i> Vous êtes déconnecté.</h2>
-                        <p style="font-size: 1.2rem; color: #555;">Merci d'avoir utilisé le chat. Actualisez la page pour vous reconnecter.</p>
-                    </div>
-                `;
+                // Rediriger vers la route de déconnexion du serveur
+                window.location.href = '/logout';
             });
 
             // Réinitialiser le compteur de messages non lus lorsque la fenêtre redevient active
@@ -539,7 +532,16 @@
 
             // Gérer le cas où le socket est finalement connecté pour mettre à jour l'ID local
             socket.on('connect', () => {
-                 updateUsersList([]); // Force la mise à jour de l'ID local dès que le socket est connecté
+                 // L'ID utilisateur est maintenant géré par l'événement 'current user'
+                 // updateUsersList sera appelée après la réception de 'current user'
+            });
+
+            // Gérer les erreurs de connexion Socket.IO (par exemple, non autorisé)
+            socket.on('connect_error', (err) => {
+                console.error('Erreur de connexion Socket.IO:', err.message);
+                if (err.message === 'Non autorisé') {
+                    window.location.href = '/login.html'; // Rediriger vers la page de connexion
+                }
             });
         }); // Fin de DOMContentLoaded
     </script>
