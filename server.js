@@ -108,6 +108,10 @@ function startServer() {
         // Diffuser le message à tous les clients
         io.emit('chat message', messageToSave);
 
+        // Émettre un événement pour les messages non lus si le destinataire n'est pas actif
+        // Cette logique est gérée côté client en vérifiant document.hasFocus()
+        // Le serveur n'a pas besoin de savoir si la fenêtre est active ou non.
+
         // 3. Sauvegarder le message dans la base de données
         try {
             await db.collection(COLLECTION_NAME).insertOne(messageToSave);

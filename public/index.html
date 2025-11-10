@@ -21,7 +21,7 @@
         #main-container {
             display: grid;
             grid-template-columns: 1fr 250px; /* Chat principal (1fr) + Sidebar (250px) */
-            grid-template-rows: 100px 1fr; /* Barre du haut (50px) + Contenu principal */
+            grid-template-rows: 70px 1fr; /* Barre du haut (70px) + Contenu principal */
             height: 100%;
             width: 100%;
         }
@@ -61,6 +61,36 @@
             background-color: #d32f2f; /* Rouge plus foncé au survol */
         }
 
+        /* Styles pour le badge de notification */
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 20px; /* Espace entre le bouton Quitter et l'icône de notification */
+        }
+
+        .notification-icon {
+            position: relative;
+            font-size: 1.5rem;
+            color: white;
+            cursor: pointer;
+        }
+
+        .notification-icon .badge {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background-color: #ffc107; /* Jaune pour le badge */
+            color: #333;
+            border-radius: 50%;
+            padding: 3px 7px;
+            font-size: 0.7rem;
+            font-weight: bold;
+            min-width: 20px;
+            text-align: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+            display: none; /* Caché par défaut, affiché si > 0 */
+        }
+
         /* ---------------------------------------------------- */
         /* ZONE PRINCIPALE DU CHAT */
         /* ---------------------------------------------------- */
@@ -74,17 +104,19 @@
         }
 
         #messages-wrapper {
-            flex-grow: 1;
+            flex-grow: 1; 
             overflow-y: auto; /* Permet le défilement des messages */
             padding: 10px 20px;
             padding-bottom: 70px; /* Espace pour le formulaire fixe */
+            display: flex; /* Utilise flexbox pour le wrapper */
+            flex-direction: column; /* Empile les messages verticalement */
         }
         
         #form { 
             background: #e0e0e0;
             padding: 10px 20px;
             display: flex; 
-            height: 60px; 
+            height: 100px; 
             box-sizing: border-box; 
             border-top: 1px solid #ccc;
         }
@@ -112,9 +144,10 @@
             padding: 8px 12px; 
             margin-bottom: 10px;
             border-radius: 15px;
-            max-width: 70%; /* Limite la largeur des bulles de message */
+            max-width: 50%; /* Limite la largeur des bulles de message */
             word-wrap: break-word; /* Empêche le débordement du texte */
             box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+           /* align-self: flex-start;  */ /* Supprimé pour permettre aux classes spécifiques de prendre le dessus */
         }
         .system-message { 
             color: #888; 
@@ -124,15 +157,18 @@
             padding: 15px 0;
             background-color: transparent; /* Les messages système n'ont pas de fond */
             box-shadow: none;
-            max-width: 100%;
+            max-width: 100%; /* S'assure qu'il prend toute la largeur disponible */
+            width: 100%; /* Force la largeur à 100% */
+            margin: 0 auto; /* Centre le message système */
         }
         .username { font-weight: bold; color: #3f51b5; margin-right: 5px; }
 
         /* Style pour les messages de l'émetteur */
         .my-message {
             background-color: #e0f7fa; /* Bleu très clair */
-            margin-left: auto; /* Aligne à droite */
+            align-self: flex-end; /* Aligne à droite */
             text-align: right;
+            margin-left: auto; /* Pousse le message vers la droite */
         }
         .my-message .username {
             color: #00796b; /* Couleur différente pour le nom d'utilisateur de l'émetteur */
@@ -141,7 +177,7 @@
         /* Style pour les messages reçus */
         .received-message {
             background-color: #f1f8e9; /* Vert très clair */
-            margin-right: auto; /* Aligne à gauche */
+            align-self: flex-start; /* Aligne à gauche */
             text-align: left;
         }
         .received-message .username {
@@ -290,7 +326,13 @@
         <!-- Barre Horizontale Supérieure -->
         <header id="chat-header">
             <h1>Chat Privé</h1>
-            <button id="quit-button"><i class="fa-solid fa-power-off"></i> Quitter</button>
+            <div class="header-right">
+                <button id="quit-button"><i class="fa-solid fa-power-off"></i> Quitter</button>
+                <div class="notification-icon">
+                    <i class="fa-solid fa-bell"></i>
+                    <span class="badge" id="unread-messages-badge">0</span>
+                </div>
+            </div>
         </header>
 
         <!-- Colonne Latérale (Sidebar) - Liste des Utilisateurs -->
@@ -346,13 +388,25 @@
             const quitButton = document.getElementById('quit-button');
             const myUserIdSpan = document.getElementById('my-user-id');
             const myAvatarDiv = document.getElementById('my-avatar');
+            const unreadMessagesBadge = document.getElementById('unread-messages-badge');
             
             // Récupération des éléments du modal
             const confirmationModal = document.getElementById('confirmation-modal');
             const confirmQuitButton = document.getElementById('confirm-quit');
             const cancelQuitButton = document.getElementById('cancel-quit');
             
-            let currentUserId = 'Inconnu'; // Variable pour stocker l'ID local
+            let currentUserId = null; // Variable pour stocker l'ID local
+            let unreadMessagesCount = 0; // Compteur de messages non lus
+
+            // Fonction utilitaire pour mettre à jour le badge de messages non lus
+            function updateUnreadMessagesBadge() {
+                if (unreadMessagesCount > 0) {
+                    unreadMessagesBadge.textContent = unreadMessagesCount;
+                    unreadMessagesBadge.style.display = 'block'; // Afficher le badge
+                } else {
+                    unreadMessagesBadge.style.display = 'none'; // Cacher le badge
+                }
+            }
 
             // Fonction utilitaire pour ajouter un message
             function displayMessage(msg) {
@@ -379,7 +433,7 @@
             // Fonction utilitaire pour mettre à jour la liste des utilisateurs
             function updateUsersList(users) {
                 // Détermine l'ID de l'utilisateur actuel
-                if (!currentUserId || currentUserId === 'Inconnu') {
+                if (!currentUserId) {
                     // Le serveur utilise les 4 premiers caractères de l'ID socket comme ID utilisateur
                     currentUserId = socket.id ? socket.id.substring(0, 4) : 'Moi';
                     myUserIdSpan.textContent = currentUserId + " (Moi)";
@@ -426,6 +480,11 @@
             // 2. Gérer la réception des nouveaux messages
             socket.on('chat message', function(msg) {
                 displayMessage(msg);
+                // Incrémenter le compteur si le message n'est pas de l'utilisateur actuel et que la fenêtre n'est pas active
+                if (msg.user !== currentUserId && !document.hasFocus()) {
+                    unreadMessagesCount++;
+                    updateUnreadMessagesBadge();
+                }
             });
 
             // 3. Gérer la réception de la liste des utilisateurs
@@ -439,6 +498,9 @@
                 if (input.value.trim()) {
                     socket.emit('chat message', { text: input.value });
                     input.value = '';
+                    // Réinitialiser le compteur de messages non lus lors de l'envoi d'un message
+                    unreadMessagesCount = 0;
+                    updateUnreadMessagesBadge();
                 }
             });
             
@@ -469,6 +531,11 @@
                 `;
             });
 
+            // Réinitialiser le compteur de messages non lus lorsque la fenêtre redevient active
+            window.addEventListener('focus', () => {
+                unreadMessagesCount = 0;
+                updateUnreadMessagesBadge();
+            });
 
             // Gérer le cas où le socket est finalement connecté pour mettre à jour l'ID local
             socket.on('connect', () => {
