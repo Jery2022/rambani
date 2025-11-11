@@ -41,6 +41,16 @@
             z-index: 10;
         }
 
+        #chat-header .header-title {
+            display: flex;
+            align-items: center;
+        }
+
+        #chat-header .header-title img {
+            height: 50px; /* Ajustez la taille du logo selon vos besoins */
+            margin-right: 15px;
+        }
+
         #chat-header h1 {
             font-size: 1.8rem;
             margin: 0;
@@ -325,7 +335,10 @@
 
         <!-- Barre Horizontale Supérieure -->
         <header id="chat-header">
-            <h1>Chat Privé</h1>
+            <div class="header-title">
+                <img src="images/img_logo_rambani_v0.png" alt="Logo Rambani">
+                <h1>Chat Privé</h1>
+            </div>
             <div class="header-right">
                 <button id="quit-button"><i class="fa-solid fa-power-off"></i> Quitter</button>
                 <div class="notification-icon">
