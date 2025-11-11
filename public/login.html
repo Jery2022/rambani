@@ -87,10 +87,11 @@
 </head>
 <body>
     <div class="login-container">
+        <h1>Rambina Chat</h1>
         <div class="logo-container">
-             <img src="images/img_logo_rambani_v1.2.png" alt="logo" class="logo">
+             <img src="images/img_logo_rambani_v1.1.png" alt="Logo Rambani" class="logo">
         </div>
-        <h1>Connexion Chat</h1>
+        <h1>Connexion</h1>
         <form id="login-form">
             <div class="input-group">
                 <label for="username">Nom d'utilisateur</label>
@@ -102,13 +103,27 @@
             </div>
             <button type="submit" class="login-button">Se connecter</button>
             <p class="error-message" id="error-message"></p>
+            <input type="hidden" name="_csrf" id="csrf-token-login">
         </form>
     </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => { // Ajout de async ici
             const loginForm = document.getElementById('login-form');
             const errorMessage = document.getElementById('error-message');
+            const csrfTokenInput = document.getElementById('csrf-token-login');
+
+            // Récupérer le jeton CSRF au chargement de la page
+            try {
+                const csrfResponse = await fetch('/api/csrf-token');
+                const csrfData = await csrfResponse.json();
+                csrfTokenInput.value = csrfData.csrfToken;
+            } catch (error) {
+                console.error('Erreur lors de la récupération du jeton CSRF:', error);
+                errorMessage.textContent = 'Erreur de sécurité: Impossible de charger le jeton CSRF.';
+                errorMessage.style.display = 'block';
+                return; // Empêche la soumission du formulaire si le jeton n'est pas chargé
+            }
 
             loginForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
@@ -116,14 +131,16 @@
 
                 const username = document.getElementById('username').value;
                 const password = document.getElementById('password').value;
+                const csrfToken = csrfTokenInput.value; // Récupérer le jeton CSRF
 
                 try {
                     const response = await fetch('/login', {
                         method: 'POST',
                         headers: {
-                            'Content-Type': 'application/json'
+                            'Content-Type': 'application/json',
+                            'CSRF-Token': csrfToken // Inclure le jeton CSRF dans l'en-tête
                         },
-                        body: JSON.stringify({ username, password })
+                        body: JSON.stringify({ username, password, _csrf: csrfToken }) // Inclure le jeton CSRF dans le corps
                     });
 
                     const data = await response.json();

@@ -67,10 +67,7 @@ let mongoClientInstance; // Variable pour stocker l'instance du client MongoDB
 // Utiliser un Set pour garantir l'unicité des IDs d'utilisateur connectés
 const connectedUsers = new Set();
 
-// Middleware pour servir les fichiers statiques depuis le dossier 'public'
-app.use(express.static(path.join(__dirname, 'public')));
-
-// Middleware pour vérifier l'authentification
+// Middleware pour vérifier l'authentification pour les routes protégées (admin)
 function isAuthenticated(req, res, next) {
     if (req.session.user) {
         next();
@@ -84,13 +81,25 @@ function isAuthenticated(req, res, next) {
     }
 }
 
-// Route pour la page de connexion
+// Middleware pour vérifier l'authentification pour accéder au chat
+function isAuthenticatedChat(req, res, next) {
+    if (req.session.user) {
+        next();
+    } else {
+        // Si la requête est pour une route publique, rediriger vers la page de connexion publique
+        if (req.path.startsWith('/')) {
+            res.redirect('/login.html');
+        }  
+    }
+}
+
+// Route pour la page de connexion publique
 app.get('/login.html', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'login.html'));
 });
 
-// Route pour la page d'accueil (chat), protégée par l'authentification
-app.get('/', isAuthenticated, (req, res) => {
+// Route pour la page d'accueil (chat), protégée par l'authentification publique
+app.get('/', isAuthenticatedChat, (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
@@ -118,7 +127,7 @@ app.get('/api/csrf-token', (req, res) => {
 });
 
 // Route d'enregistrement (pour les tests ou si l'utilisateur souhaite une fonctionnalité d'enregistrement)
-app.post('/register', async (req, res) => {
+app.post('/register', isAuthenticated, async (req, res) => {
     const { username, password } = req.body;
 
     if (!username || !password) {
@@ -502,6 +511,9 @@ httpServer.listen(PORT, () => {
 
 
 }
+
+// Middleware pour servir les fichiers statiques depuis le dossier 'public' (déplacé après les routes)
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Lancer le processus de connexion à la base de données au démarrage
 connectDB();
