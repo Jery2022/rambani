@@ -16,14 +16,15 @@
         }
         .login-container {
             background-color: #fff;
-            padding: 30px;
+            padding: 40px;
             border-radius: 8px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-            width: 300px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            width: 100%;
+            max-width: 400px;
             text-align: center;
         }
         .login-container h2 {
-            margin-bottom: 20px;
+            margin-bottom: 30px;
             color: #333;
         }
         .login-container input[type="text"],
@@ -42,21 +43,62 @@
             border: none;
             border-radius: 4px;
             cursor: pointer;
-            font-size: 16px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            transition: background-color 0.2s;
         }
         .login-container button:hover {
             background-color: #0056b3;
+        }
+        .logo-container {
+            display: flex;
+            justify-content: center;
+            text-align: center;
+            margin: 20px 0 10px 0;
+        }
+        .logo {
+            width: 150px;
+            height: 150px;
+            margin-bottom: 10px;
+        }
+        .error-message {
+            color: #f44336;
+            margin-top: 15px;
+            font-weight: bold;
+            display: none; /* Caché par défaut */
         }
     </style>
 </head>
 <body>
     <div class="login-container">
+        <div class="logo-container">
+             <img src="/images/img_logo_rambani_v1.2.png" alt="logo" class="logo">
+        </div>
         <h2>Connexion Administration</h2>
         <form action="/admin/login" method="POST">
             <input type="text" name="username" placeholder="Nom d'utilisateur" required>
             <input type="password" name="password" placeholder="Mot de passe" required>
+            <input type="hidden" name="_csrf" id="csrf-token">
             <button type="submit">Se connecter</button>
+            <p class="error-message" id="error-message"></p>
         </form>
     </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Afficher le message d'erreur du serveur
+            const errorMessage = document.getElementById('error-message');
+
+            try {
+                const response = await fetch('/api/csrf-token');
+                const data = await response.json();
+                document.getElementById('csrf-token').value = data.csrfToken;
+            } catch (error) {
+                console.error('Erreur lors de la récupération du jeton CSRF:', error);
+                errorMessage.textContent = data.message || 'Erreur de sécurité: Impossible de charger le jeton CSRF.';
+                errorMessage.style.display = 'block';
+                //alert('Erreur de sécurité: Impossible de charger le jeton CSRF.');
+            }
+        });
+    </script>
 </body>
 </html>

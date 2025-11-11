@@ -148,6 +148,7 @@
                     <option value="admin">Administrateur</option>
                 </select>
             </div>
+            <input type="hidden" name="_csrf" id="csrf-token-register">
             <button type="submit" class="btn">Enregistrer</button>
             <div id="register-message" class="message"></div>
         </form>
@@ -177,6 +178,20 @@
             const registerMessage = document.getElementById('register-message');
             const usersTableBody = document.querySelector('#users-table tbody');
             const usersMessage = document.getElementById('users-message');
+            let csrfToken = ''; // Variable pour stocker le jeton CSRF
+
+            // Fonction pour récupérer le jeton CSRF
+            async function getCsrfToken() {
+                try {
+                    const response = await fetch('/api/csrf-token');
+                    const data = await response.json();
+                    csrfToken = data.csrfToken;
+                    document.getElementById('csrf-token-register').value = csrfToken;
+                } catch (error) {
+                    console.error('Erreur lors de la récupération du jeton CSRF:', error);
+                    alert('Erreur de sécurité: Impossible de charger le jeton CSRF.');
+                }
+            }
 
             // Fonction pour afficher les messages
             function showMessage(element, msg, type) {
@@ -233,7 +248,10 @@
                 }
                 try {
                     const response = await fetch(`/api/admin/users/${userId}`, {
-                        method: 'DELETE'
+                        method: 'DELETE',
+                        headers: {
+                            'CSRF-Token': csrfToken // Inclure le jeton CSRF dans l'en-tête
+                        }
                     });
                     const data = await response.json();
                     if (response.ok) {
@@ -259,9 +277,10 @@
                     const response = await fetch('/api/admin/users', {
                         method: 'POST',
                         headers: {
-                            'Content-Type': 'application/json'
+                            'Content-Type': 'application/json',
+                            'CSRF-Token': csrfToken // Inclure le jeton CSRF dans l'en-tête
                         },
-                        body: JSON.stringify({ username, password, role })
+                        body: JSON.stringify({ username, password, role, _csrf: csrfToken }) // Inclure le jeton CSRF dans le corps pour les formulaires
                     });
                     const data = await response.json();
                     if (response.ok) {
@@ -281,6 +300,7 @@
 
             // Charger les utilisateurs au démarrage
             loadUsers();
+            getCsrfToken(); // Récupérer le jeton CSRF au démarrage
         });
     </script>
 </body>

@@ -80,7 +80,7 @@
                 <option value="user">Utilisateur</option>
                 <option value="admin">Administrateur</option>
             </select>
-
+            <input type="hidden" name="_csrf" id="csrf-token-edit">
             <button type="submit">Mettre à jour</button>
             <button type="button" class="back-button" onclick="window.location.href='/admin'">Retour à l'administration</button>
         </form>
@@ -106,7 +106,17 @@
 
                 document.getElementById('userId').value = user._id;
                 document.getElementById('username').value = user.username;
-                document.getElementById('role').value = user.role;
+            document.getElementById('role').value = user.role;
+
+            // Récupérer le jeton CSRF
+            try {
+                const response = await fetch('/api/csrf-token');
+                const data = await response.json();
+                document.getElementById('csrf-token-edit').value = data.csrfToken;
+            } catch (error) {
+                console.error('Erreur lors de la récupération du jeton CSRF:', error);
+                alert('Erreur de sécurité: Impossible de charger le jeton CSRF.');
+            }
 
             } catch (error) {
                 console.error('Erreur lors du chargement des données utilisateur:', error);
@@ -129,7 +139,8 @@
                     const response = await fetch(`/api/admin/users/${userId}`, {
                         method: 'PUT',
                         headers: {
-                            'Content-Type': 'application/json'
+                            'Content-Type': 'application/json',
+                            'CSRF-Token': document.getElementById('csrf-token-edit').value // Inclure le jeton CSRF dans l'en-tête
                         },
                         body: JSON.stringify(data)
                     });
