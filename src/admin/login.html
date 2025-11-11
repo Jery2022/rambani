@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Connexion Administration</title>
+    <link rel="icon" href="/favicon.ico" type="image/x-icon">
+    <title>Rambani - Connexion Administration</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -16,14 +17,15 @@
         }
         .login-container {
             background-color: #fff;
-            padding: 30px;
+            padding: 40px;
             border-radius: 8px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-            width: 300px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            width: 100%;
+            max-width: 400px;
             text-align: center;
         }
         .login-container h2 {
-            margin-bottom: 20px;
+            margin-bottom: 30px;
             color: #333;
         }
         .login-container input[type="text"],
@@ -42,21 +44,101 @@
             border: none;
             border-radius: 4px;
             cursor: pointer;
-            font-size: 16px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            transition: background-color 0.2s;
         }
         .login-container button:hover {
             background-color: #0056b3;
+        }
+        .logo-container {
+            display: flex;
+            justify-content: center;
+            text-align: center;
+            margin: 20px 0 10px 0;
+        }
+        .logo {
+            width: 150px;
+            height: 150px;
+            margin-bottom: 10px;
+        }
+        .error-message {
+            color: #f44336;
+            margin-top: 15px;
+            font-weight: bold;
+            display: none; /* Caché par défaut */
         }
     </style>
 </head>
 <body>
     <div class="login-container">
+        <div class="logo-container">
+             <img src="/images/img_logo_rambani_v1.2.png" alt="logo" class="logo">
+        </div>
         <h2>Connexion Administration</h2>
         <form action="/admin/login" method="POST">
             <input type="text" name="username" placeholder="Nom d'utilisateur" required>
             <input type="password" name="password" placeholder="Mot de passe" required>
+            <input type="hidden" name="_csrf" id="csrf-token">
             <button type="submit">Se connecter</button>
+            <p class="error-message" id="error-message"></p>
         </form>
     </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const loginForm = document.querySelector('form');
+            const errorMessageElement = document.getElementById('error-message');
+            let csrfToken = '';
+
+            // Fonction pour récupérer le jeton CSRF
+            async function getCsrfToken() {
+                try {
+                    const response = await fetch('/api/csrf-token');
+                    const data = await response.json();
+                    csrfToken = data.csrfToken;
+                    document.getElementById('csrf-token').value = csrfToken;
+                } catch (error) {
+                    console.error('Erreur lors de la récupération du jeton CSRF:', error);
+                    errorMessageElement.textContent = 'Erreur de sécurité: Impossible de charger le jeton CSRF.';
+                    errorMessageElement.style.display = 'block';
+                }
+            }
+
+            // Gérer la soumission du formulaire
+            loginForm.addEventListener('submit', async (e) => {
+                e.preventDefault(); // Empêcher la soumission par défaut du formulaire
+
+                const username = loginForm.elements.username.value;
+                const password = loginForm.elements.password.value;
+
+                try {
+                    const response = await fetch('/admin/login', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'CSRF-Token': csrfToken // Inclure le jeton CSRF dans l'en-tête
+                        },
+                        body: JSON.stringify({ username, password, _csrf: csrfToken }) // Inclure le jeton CSRF dans le corps
+                    });
+
+                    if (response.ok) {
+                        // Connexion réussie, rediriger vers la page d'administration
+                        window.location.href = '/admin';
+                    } else {
+                        const errorData = await response.json(); // Tenter de parser la réponse JSON
+                        errorMessageElement.textContent = errorData.message || 'Erreur de connexion inconnue.';
+                        errorMessageElement.style.display = 'block';
+                    }
+                } catch (error) {
+                    console.error('Erreur lors de la connexion:', error);
+                    errorMessageElement.textContent = 'Une erreur est survenue lors de la connexion.';
+                    errorMessageElement.style.display = 'block';
+                }
+            });
+
+            // Récupérer le jeton CSRF au chargement de la page
+            getCsrfToken();
+        });
+    </script>
 </body>
 </html>

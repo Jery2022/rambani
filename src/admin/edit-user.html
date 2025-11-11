@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Modifier l'utilisateur</title>
+    <link rel="icon" href="/favicon.ico" type="image/x-icon">
+    <title>Rambani - Modification d'utilisateur</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -14,6 +15,64 @@
             height: 100vh;
             margin: 0;
         }
+        /* MODAL DE CONFIRMATION (Remplacement de alert()) */
+        #confirmation-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #confirmation-modal > div {
+            background: white;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            max-width: 350px;
+            text-align: center;
+        }
+
+        #confirmation-modal p {
+            font-size: 1.1rem;
+            font-weight: 500;
+            margin-bottom: 0;
+        }
+
+        .modal-buttons button {
+            transition: background-color 0.2s;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 0 10px;
+        }
+
+        #confirm-action {
+            background-color: #28a745; /* Vert pour succès */
+            color: white;
+        }
+
+        #confirm-action:hover {
+            background-color: #218838;
+        }
+
+        #cancel-action {
+            background-color: #f44336; /* Rouge pour erreur/annulation */
+            color: white;
+        }
+
+        #cancel-action:hover {
+            background-color: #d32f2f;
+        }
+        /* FIN MODAL */
+
         .edit-container {
             background-color: #fff;
             padding: 30px;
@@ -80,20 +139,68 @@
                 <option value="user">Utilisateur</option>
                 <option value="admin">Administrateur</option>
             </select>
-
+            <input type="hidden" name="_csrf" id="csrf-token-edit">
             <button type="submit">Mettre à jour</button>
             <button type="button" class="back-button" onclick="window.location.href='/admin'">Retour à l'administration</button>
         </form>
     </div>
 
+    <!-- MODAL DE CONFIRMATION (Remplacement de alert()) -->
+    <div id="confirmation-modal">
+        <div>
+            <p id="modal-message">Message de la modale</p>
+            <div class="modal-buttons" style="display: flex; justify-content: space-around; margin-top: 20px;">
+                <button id="confirm-action">OK</button>
+                <!-- Le bouton Annuler ne sera pas toujours affiché, dépendra de l'action -->
+                <button id="cancel-action" style="display: none;">Annuler</button> 
+            </div>
+        </div>
+    </div>
+    <!-- FIN MODAL -->
+
     <script>
         document.addEventListener('DOMContentLoaded', async () => {
             const urlParams = new URLSearchParams(window.location.search);
             const userId = urlParams.get('id');
+            console.log('ID utilisateur récupéré de l\'URL:', userId); // Ajout d'un log
+
+            // Éléments du modal
+            const confirmationModal = document.getElementById('confirmation-modal');
+            const modalMessage = document.getElementById('modal-message');
+            const confirmActionButton = document.getElementById('confirm-action');
+            const cancelActionButton = document.getElementById('cancel-action');
+
+            // Fonction pour afficher le modal (pour les alertes simples)
+            function showAlertModal(message, onConfirm = null) {
+                modalMessage.textContent = message;
+                confirmationModal.style.display = 'flex';
+                cancelActionButton.style.display = 'none'; // Cache le bouton Annuler pour les alertes
+                confirmActionButton.onclick = () => {
+                    confirmationModal.style.display = 'none';
+                    if (onConfirm) onConfirm();
+                };
+            }
+
+            // Fonction pour afficher le modal (pour les confirmations)
+            function showConfirmationModal(message, onConfirm, onCancel = null) {
+                modalMessage.textContent = message;
+                confirmationModal.style.display = 'flex';
+                cancelActionButton.style.display = 'inline-block'; // Affiche le bouton Annuler pour les confirmations
+                confirmActionButton.onclick = () => {
+                    confirmationModal.style.display = 'none';
+                    onConfirm();
+                };
+                cancelActionButton.onclick = () => {
+                    confirmationModal.style.display = 'none';
+                    if (onCancel) onCancel();
+                };
+            }
+
 
             if (!userId) {
-                alert('ID utilisateur manquant.');
-                window.location.href = '/admin';
+                showAlertModal('ID utilisateur manquant.', () => {
+                    window.location.href = '/admin';
+                });
                 return;
             }
 
@@ -106,12 +213,23 @@
 
                 document.getElementById('userId').value = user._id;
                 document.getElementById('username').value = user.username;
-                document.getElementById('role').value = user.role;
+            document.getElementById('role').value = user.role;
+
+            // Récupérer le jeton CSRF
+            try {
+                const response = await fetch('/api/csrf-token');
+                const data = await response.json();
+                document.getElementById('csrf-token-edit').value = data.csrfToken;
+            } catch (error) {
+                console.error('Erreur lors de la récupération du jeton CSRF:', error);
+                showAlertModal('Erreur de sécurité: Impossible de charger le jeton CSRF.');
+            }
 
             } catch (error) {
                 console.error('Erreur lors du chargement des données utilisateur:', error);
-                alert('Erreur lors du chargement des données utilisateur: ' + error.message);
-                window.location.href = '/admin';
+                showAlertModal('Erreur lors du chargement des données utilisateur: ' + error.message, () => {
+                    window.location.href = '/admin';
+                });
             }
 
             document.getElementById('editUserForm').addEventListener('submit', async (event) => {
@@ -129,7 +247,8 @@
                     const response = await fetch(`/api/admin/users/${userId}`, {
                         method: 'PUT',
                         headers: {
-                            'Content-Type': 'application/json'
+                            'Content-Type': 'application/json',
+                            'CSRF-Token': document.getElementById('csrf-token-edit').value // Inclure le jeton CSRF dans l'en-tête
                         },
                         body: JSON.stringify(data)
                     });
@@ -139,12 +258,13 @@
                         throw new Error(errorData.message || 'Erreur lors de la mise à jour de l\'utilisateur.');
                     }
 
-                    alert('Utilisateur mis à jour avec succès!');
-                    window.location.href = '/admin';
+                    showAlertModal('Utilisateur mis à jour avec succès!', () => {
+                        window.location.href = '/admin';
+                    });
 
                 } catch (error) {
                     console.error('Erreur lors de la mise à jour:', error);
-                    alert('Erreur lors de la mise à jour: ' + error.message);
+                    showAlertModal('Erreur lors de la mise à jour: ' + error.message);
                 }
             });
         });

@@ -1,11 +1,13 @@
 const express = require('express');
 const { createServer } = require('http');
 const { Server } = require('socket.io');
-const { MongoClient } = require('mongodb');
+const { MongoClient, ObjectId } = require('mongodb'); // Ajout de ObjectId
 const path = require('path');
 const bcrypt = require('bcrypt');
 const session = require('express-session');
-const MongoStore = require('connect-mongo'); // Importer connect-mongo
+const MongoStore = require('connect-mongo'); // Importe connect-mongo
+const csrf = require('csurf'); // Importe csurf
+const cookieParser = require('cookie-parser'); // Importe cookie-parser
 
 // --- Configuration du Serveur et de la Base de Données ---
 
@@ -23,8 +25,8 @@ const io = new Server(httpServer, {
 
 // Configuration CORS si votre client est servi sur un domaine différent
 cors: {
-origin: "*",
-methods: ["GET", "POST"]
+    origin: "*",
+    methods: ["GET", "POST","UPDATE"]
 }
 });
 
@@ -32,21 +34,32 @@ methods: ["GET", "POST"]
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Utiliser cookie-parser avant la session et csurf
+app.use(cookieParser());
+
 // Configuration de la session
 const sessionMiddleware = session({
-    secret: 'super_secret_key_for_chat_app', // Remplacez par une clé secrète forte et unique
+    secret: process.env.SESSION_SECRET || 'super_secret_key_for_chat_app', // Utiliser une variable d'environnement pour la clé secrète
     resave: false,
     saveUninitialized: false,
     store: MongoStore.create({
-        mongoUrl: MONGODB_URI, // Utiliser mongoUrl directement
+        mongoUrl: MONGODB_URI,
         dbName: DB_NAME,
         collectionName: 'sessions',
-        ttl: 14 * 24 * 60 * 60 // = 14 jours. Par défaut
+        ttl: 7 * 24 * 60 * 60 // = 7 jours. Par défaut
     }),
-    cookie: { secure: false, sameSite: 'lax' } // Mettre à true si vous utilisez HTTPS, et sameSite à 'lax'
+    cookie: { 
+        secure: process.env.NODE_ENV === 'production', // Utiliser secure: true en production (HTTPS)
+        sameSite: 'Lax', // 'Strict' ou 'Lax' pour la protection CSRF
+        httpOnly: true // Empêche l'accès au cookie via JavaScript côté client
+    }
 });
 
 app.use(sessionMiddleware);
+
+// Configuration CSRF
+const csrfProtection = csrf({ cookie: true });
+app.use(csrfProtection); // Appliquer globalement après la session et cookie-parser
 
 let db; // Variable pour stocker l'objet de la base de données MongoDB
 let mongoClientInstance; // Variable pour stocker l'instance du client MongoDB
@@ -83,7 +96,9 @@ app.get('/', isAuthenticated, (req, res) => {
 
 // Route pour la page de connexion de l'administration
 app.get('/admin/login', (req, res) => {
-    res.sendFile(path.join(__dirname, 'src', 'admin', 'login.html'));
+    res.sendFile(path.join(__dirname, 'src', 'admin', 'login.html'), {
+        csrfToken: req.csrfToken()
+    });
 });
 
 // Route de déconnexion
@@ -95,6 +110,11 @@ app.get('/logout', (req, res) => {
         res.clearCookie('connect.sid'); // Supprime le cookie de session
         res.redirect('/login.html');
     });
+});
+
+// Route pour obtenir le jeton CSRF
+app.get('/api/csrf-token', (req, res) => {
+    res.json({ csrfToken: req.csrfToken() });
 });
 
 // Route d'enregistrement (pour les tests ou si l'utilisateur souhaite une fonctionnalité d'enregistrement)
@@ -123,7 +143,7 @@ app.post('/register', async (req, res) => {
     }
 });
 
-// Route de connexion
+// Route de connexion (chat)
 app.post('/login', async (req, res) => {
     const { username, password } = req.body;
 
@@ -173,7 +193,7 @@ app.post('/admin/login', async (req, res) => {
     const { username, password } = req.body;
 
     if (!username || !password) {
-        return res.status(400).send('Pseudo et mot de passe sont requis.');
+        return res.status(400).json({ message: 'Pseudo et mot de passe sont requis.' });
     }
 
     try {
@@ -181,25 +201,25 @@ app.post('/admin/login', async (req, res) => {
         const user = await usersCollection.findOne({ username });
 
         if (!user) {
-            return res.status(401).send('Pseudo ou mot de passe incorrect.');
+            return res.status(401).json({ message: 'Pseudo ou mot de passe incorrect.' });
         }
 
         const isPasswordValid = await bcrypt.compare(password, user.password);
 
         if (!isPasswordValid) {
-            return res.status(401).send('Pseudo ou mot de passe incorrect.');
+            return res.status(401).json({ message: 'Pseudo ou mot de passe incorrect.' });
         }
 
         if (user.role !== 'admin') {
-            return res.status(403).send('Accès refusé. Seuls les administrateurs peuvent se connecter ici.');
+            return res.status(403).json({ message: 'Accès refusé. Seuls les administrateurs peuvent se connecter ici.' });
         }
 
         req.session.user = { id: user._id.toString(), username: user.username, role: user.role };
         console.log('Admin login successful, session user:', req.session.user);
-        res.redirect('/admin'); // Rediriger vers la page d'administration
+        res.status(200).json({ message: 'Connexion réussie.' }); // Envoyer une réponse JSON pour le succès
     } catch (error) {
         console.error('Erreur lors de la connexion admin:', error);
-        res.status(500).send('Erreur serveur lors de la connexion.');
+        res.status(500).json({ message: 'Erreur serveur lors de la connexion.' });
     }
 });
 
@@ -219,8 +239,15 @@ app.get('/api/admin/users', isAdmin, async (req, res) => {
 app.post('/api/admin/users', isAdmin, async (req, res) => {
     const { username, password, role } = req.body;
 
-    if (!username || !password || !role) {
-        return res.status(400).json({ message: 'Pseudo, mot de passe et rôle sont requis.' });
+    // Validation des entrées
+    if (!username || typeof username !== 'string' || username.trim().length === 0) {
+        return res.status(400).json({ message: 'Pseudo invalide.' });
+    }
+    if (!password || typeof password !== 'string' || password.length < 8) { // Exiger une longueur minimale pour le mot de passe
+        return res.status(400).json({ message: 'Le mot de passe doit contenir au moins 8 caractères.' });
+    }
+    if (!role || typeof role !== 'string' || !['user', 'admin'].includes(role)) {
+        return res.status(400).json({ message: 'Rôle invalide.' });
     }
 
     try {
@@ -245,9 +272,14 @@ app.post('/api/admin/users', isAdmin, async (req, res) => {
 app.delete('/api/admin/users/:id', isAdmin, async (req, res) => {
     const { id } = req.params;
 
+    // Valider si l'ID est un ObjectId MongoDB valide
+    if (!ObjectId.isValid(id)) {
+        return res.status(400).json({ message: 'ID utilisateur invalide.' });
+    }
+
     try {
         const usersCollection = db.collection(USERS_COLLECTION_NAME);
-        const result = await usersCollection.deleteOne({ _id: new MongoClient.ObjectId(id) });
+        const result = await usersCollection.deleteOne({ _id: new ObjectId(id) });
 
         if (result.deletedCount === 0) {
             return res.status(404).json({ message: 'Utilisateur non trouvé.' });
@@ -268,12 +300,22 @@ app.get('/admin/edit-user', isAuthenticated, isAdmin, (req, res) => {
 // API pour récupérer un utilisateur par son ID (pour le formulaire de modification)
 app.get('/api/admin/users/:id', isAuthenticated, isAdmin, async (req, res) => {
     const { id } = req.params;
+    console.log(`Serveur: Requête GET pour l'utilisateur avec ID: ${id}`); // Log l'ID reçu
+
+    // Valider si l'ID est un ObjectId MongoDB valide
+    if (!ObjectId.isValid(id)) {
+        console.log(`Serveur: ID utilisateur invalide: ${id}`); // Log si l'ID est invalide
+        return res.status(400).json({ message: 'ID utilisateur invalide.' });
+    }
+
     try {
         const usersCollection = db.collection(USERS_COLLECTION_NAME);
-        const user = await usersCollection.findOne({ _id: new MongoClient.ObjectId(id) }, { projection: { password: 0 } });
+        const user = await usersCollection.findOne({ _id: new ObjectId(id) }, { projection: { password: 0 } });
         if (!user) {
+            console.log(`Serveur: Utilisateur non trouvé pour l'ID: ${id}`); // Log si l'utilisateur n'est pas trouvé
             return res.status(404).json({ message: 'Utilisateur non trouvé.' });
         }
+        console.log(`Serveur: Utilisateur trouvé: ${user.username}`); // Log l'utilisateur trouvé
         res.status(200).json(user);
     } catch (error) {
         console.error('Erreur lors de la récupération de l\'utilisateur:', error);
@@ -286,8 +328,20 @@ app.put('/api/admin/users/:id', isAuthenticated, isAdmin, async (req, res) => {
     const { id } = req.params;
     const { username, password, role } = req.body;
 
-    if (!username || !role) {
-        return res.status(400).json({ message: 'Pseudo et rôle sont requis.' });
+    // Valider si l'ID est un ObjectId MongoDB valide
+    if (!ObjectId.isValid(id)) {
+        return res.status(400).json({ message: 'ID utilisateur invalide.' });
+    }
+
+    // Validation des entrées
+    if (!username || typeof username !== 'string' || username.trim().length === 0) {
+        return res.status(400).json({ message: 'Pseudo invalide.' });
+    }
+    if (!role || typeof role !== 'string' || !['user', 'admin'].includes(role)) {
+        return res.status(400).json({ message: 'Rôle invalide.' });
+    }
+    if (password && (typeof password !== 'string' || password.length < 8)) { // Le mot de passe est optionnel, mais s'il est fourni, il doit être valide
+        return res.status(400).json({ message: 'Le nouveau mot de passe doit contenir au moins 8 caractères.' });
     }
 
     try {
@@ -299,7 +353,7 @@ app.put('/api/admin/users/:id', isAuthenticated, isAdmin, async (req, res) => {
         }
 
         const result = await usersCollection.updateOne(
-            { _id: new MongoClient.ObjectId(id) },
+            { _id: new ObjectId(id) },
             { $set: updateData }
         );
 
@@ -333,6 +387,15 @@ async function connectDB() {
 
 // Middleware pour servir les fichiers statiques du dossier 'src/admin'
 app.use('/admin', express.static(path.join(__dirname, 'src', 'admin')));
+
+// Gestion des erreurs CSRF
+app.use((err, req, res, next) => {
+    if (err.code === 'EBADCSRFTOKEN') {
+        res.status(403).json({ message: 'Requête non autorisée (CSRF token manquant ou invalide).' });
+    } else {
+        next(err);
+    }
+});
 
 // Fonction pour démarrer le serveur Socket.IO
 function startServer() {

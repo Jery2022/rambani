@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Administration du Chat</title>
+    <link rel="icon" href="/favicon.ico" type="image/x-icon">
+    <title>Rambani - Administration Chat</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
         body {
@@ -13,19 +14,64 @@
             display: flex;
             flex-direction: column;
             min-height: 100vh;
+            width: 100%;
             color: #333;
+            margin-top: 80px; /* Compense la hauteur de l'en-tête fixe */
         }
         header {
-            background-color: #3f51b5;
-            color: white;
-            padding: 20px;
-            text-align: center;
+            background-color:white ;
+            color:  #3f51b5;
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            position: fixed; /* Fixe l'en-tête */
+            top: 0;
+            left: 0;
+            width: 100%; 
+            height: 80px; /* Hauteur fixe pour l'en-tête */
+            z-index: 1000;
+            box-sizing: border-box; /* Inclut le padding dans la largeur totale */
         }
+        header .header-title {
+            display: flex;
+            align-items: center;
+            flex-grow: 1; /* Permet au titre de prendre l'espace disponible */
+            min-width: 0; /* Permet au contenu de rétrécir si nécessaire */
+        }
+
+        header .header-title img {
+            height: 72px; /* Ajustez la taille du logo selon vos besoins */
+            margin-right: 15px;
+            flex-shrink: 0; /* Empêche le logo de rétrécir */
+        }
+
         header h1 {
             margin: 0;
             font-size: 2.2rem;
+            flex-grow: 1; /* Permet au titre de prendre l'espace disponible */
+            white-space: nowrap; /* Empêche le titre de passer à la ligne */
+            overflow: hidden; /* Cache le texte qui déborde */
+            text-overflow: ellipsis; /* Ajoute des points de suspension pour le texte débordant */
         }
+
+        #quit-button {
+            background-color: #f44336; /* Rouge */
+            color: white;
+            border: none;
+            padding: 8px 20px; /* Réduire le padding pour rendre le bouton plus compact */
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.2s;
+            flex-shrink: 0; /* Empêche le bouton de rétrécir */
+            margin-left: 15px; /* Ajoute un peu d'espace à gauche du bouton */
+        }
+        #quit-button:hover {
+            background-color: #d32f2f; /* Rouge plus foncé au survol */
+        }
+
         .container {
             flex-grow: 1;
             padding: 20px;
@@ -126,15 +172,31 @@
     </style>
 </head>
 <body>
+    <!-- MODAL DE CONFIRMATION (Remplacement de confirm()) -->
+    <div id="confirmation-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
+        <div style="background: white; padding: 25px; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); max-width: 350px; text-align: center;">
+            <p id="modal-message">Êtes-vous sûr de vouloir quitter le panneau d'administration ?</p>
+            <div class="modal-buttons" style="display: flex; justify-content: space-around; margin-top: 20px;">
+                <button id="confirm-action" style="transition: background-color 0.2s; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; margin: 0 10px; background-color: #f44336; color: white;">Confirmer</button>
+                <button id="cancel-action" style="transition: background-color 0.2s; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; margin: 0 10px; background-color: #ccc; color: #333;">Annuler</button>
+            </div>
+        </div>
+    </div>
+    <!-- FIN MODAL -->
+
     <header>
-        <h1>Panneau d'Administration du Chat</h1>
+        <div class="header-title">
+            <img src="/images/img_logo_rambani_v0.png" alt="Logo Rambani" >
+            <h1>Panneau d'Administration du Chat</h1>
+        </div>
+        <button id="quit-button"><i class="fa-solid fa-power-off"></i> Quitter</button>
     </header>
 
     <div class="container">
-        <h2>Enregistrer un nouvel utilisateur</h2>
+        <h2>Ajouter un nouvel utilisateur</h2>
         <form id="register-form">
             <div class="form-group">
-                <label for="reg-username">Pseudo</label>
+                <label for="reg-username">Nom d'utilisateur</label>
                 <input type="text" id="reg-username" required>
             </div>
             <div class="form-group">
@@ -148,6 +210,7 @@
                     <option value="admin">Administrateur</option>
                 </select>
             </div>
+            <input type="hidden" name="_csrf" id="csrf-token-register">
             <button type="submit" class="btn">Enregistrer</button>
             <div id="register-message" class="message"></div>
         </form>
@@ -177,6 +240,49 @@
             const registerMessage = document.getElementById('register-message');
             const usersTableBody = document.querySelector('#users-table tbody');
             const usersMessage = document.getElementById('users-message');
+            const quitButton = document.getElementById('quit-button');
+            
+            // Éléments du modal
+            const confirmationModal = document.getElementById('confirmation-modal');
+            const modalMessage = document.getElementById('modal-message');
+            const confirmActionButton = document.getElementById('confirm-action');
+            const cancelActionButton = document.getElementById('cancel-action');
+
+            let csrfToken = ''; // Variable pour stocker le jeton CSRF
+            let currentAction = null; // Pour stocker l'action à exécuter après confirmation
+
+            // Fonction pour afficher le modal
+            function showConfirmationModal(message, onConfirm) {
+                modalMessage.textContent = message;
+                confirmationModal.style.display = 'flex';
+                currentAction = onConfirm; // Stocke la fonction à appeler si l'utilisateur confirme
+            }
+
+            // Gérer les clics sur les boutons du modal
+            confirmActionButton.addEventListener('click', () => {
+                confirmationModal.style.display = 'none';
+                if (currentAction) {
+                    currentAction(); // Exécute l'action stockée
+                }
+            });
+
+            cancelActionButton.addEventListener('click', () => {
+                confirmationModal.style.display = 'none';
+                currentAction = null; // Réinitialise l'action
+            });
+
+            // Fonction pour récupérer le jeton CSRF
+            async function getCsrfToken() {
+                try {
+                    const response = await fetch('/api/csrf-token');
+                    const data = await response.json();
+                    csrfToken = data.csrfToken;
+                    document.getElementById('csrf-token-register').value = csrfToken;
+                } catch (error) {
+                    console.error('Erreur lors de la récupération du jeton CSRF:', error);
+                    alert('Erreur de sécurité: Impossible de charger le jeton CSRF.');
+                }
+            }
 
             // Fonction pour afficher les messages
             function showMessage(element, msg, type) {
@@ -228,24 +334,26 @@
 
             // Fonction pour supprimer un utilisateur
             async function deleteUser(userId, username) {
-                if (!confirm(`Êtes-vous sûr de vouloir supprimer l'utilisateur "${username}" (ID: ${userId}) ?`)) {
-                    return;
-                }
-                try {
-                    const response = await fetch(`/api/admin/users/${userId}`, {
-                        method: 'DELETE'
-                    });
-                    const data = await response.json();
-                    if (response.ok) {
-                        showMessage(usersMessage, data.message, 'success');
-                        loadUsers(); // Recharger la liste après suppression
-                    } else {
-                        showMessage(usersMessage, data.message || 'Erreur lors de la suppression.', 'error');
+                showConfirmationModal(`Êtes-vous sûr de vouloir supprimer l'utilisateur "${username}" (ID: ${userId}) ?`, async () => {
+                    try {
+                        const response = await fetch(`/api/admin/users/${userId}`, {
+                            method: 'DELETE',
+                            headers: {
+                                'CSRF-Token': csrfToken // Inclure le jeton CSRF dans l'en-tête
+                            }
+                        });
+                        const data = await response.json();
+                        if (response.ok) {
+                            showMessage(usersMessage, data.message, 'success');
+                            loadUsers(); // Recharger la liste après suppression
+                        } else {
+                            showMessage(usersMessage, data.message || 'Erreur lors de la suppression.', 'error');
+                        }
+                    } catch (error) {
+                        console.error('Erreur lors de la suppression:', error);
+                        showMessage(usersMessage, 'Une erreur est survenue lors de la suppression.', 'error');
                     }
-                } catch (error) {
-                    console.error('Erreur lors de la suppression:', error);
-                    showMessage(usersMessage, 'Une erreur est survenue lors de la suppression.', 'error');
-                }
+                }); // Fermeture correcte du callback de showConfirmationModal
             }
 
             // Gérer l'enregistrement d'un nouvel utilisateur
@@ -259,9 +367,10 @@
                     const response = await fetch('/api/admin/users', {
                         method: 'POST',
                         headers: {
-                            'Content-Type': 'application/json'
+                            'Content-Type': 'application/json',
+                            'CSRF-Token': csrfToken // Inclure le jeton CSRF dans l'en-tête
                         },
-                        body: JSON.stringify({ username, password, role })
+                        body: JSON.stringify({ username, password, role, _csrf: csrfToken }) // Inclure le jeton CSRF dans le corps pour les formulaires
                     });
                     const data = await response.json();
                     if (response.ok) {
@@ -279,8 +388,16 @@
                 }
             });
 
+            // Gérer le bouton Quitter
+            quitButton.addEventListener('click', function() {
+                showConfirmationModal('Êtes-vous sûr de vouloir quitter le panneau d\'administration ?', () => {
+                    window.location.href = '/logout'; // Rediriger vers la route de déconnexion
+                });
+            });
+
             // Charger les utilisateurs au démarrage
             loadUsers();
+            getCsrfToken(); // Récupérer le jeton CSRF au démarrage
         });
     </script>
 </body>
