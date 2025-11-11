@@ -193,7 +193,7 @@ app.post('/admin/login', async (req, res) => {
     const { username, password } = req.body;
 
     if (!username || !password) {
-        return res.status(400).send('Pseudo et mot de passe sont requis.');
+        return res.status(400).json({ message: 'Pseudo et mot de passe sont requis.' });
     }
 
     try {
@@ -201,25 +201,25 @@ app.post('/admin/login', async (req, res) => {
         const user = await usersCollection.findOne({ username });
 
         if (!user) {
-            return res.status(401).send('Pseudo ou mot de passe incorrect.');
+            return res.status(401).json({ message: 'Pseudo ou mot de passe incorrect.' });
         }
 
         const isPasswordValid = await bcrypt.compare(password, user.password);
 
         if (!isPasswordValid) {
-            return res.status(401).send('Pseudo ou mot de passe incorrect.');
+            return res.status(401).json({ message: 'Pseudo ou mot de passe incorrect.' });
         }
 
         if (user.role !== 'admin') {
-            return res.status(403).send('Accès refusé. Seuls les administrateurs peuvent se connecter ici.');
+            return res.status(403).json({ message: 'Accès refusé. Seuls les administrateurs peuvent se connecter ici.' });
         }
 
         req.session.user = { id: user._id.toString(), username: user.username, role: user.role };
         console.log('Admin login successful, session user:', req.session.user);
-        res.redirect('/admin'); // Rediriger vers la page d'administration
+        res.status(200).json({ message: 'Connexion réussie.' }); // Envoyer une réponse JSON pour le succès
     } catch (error) {
         console.error('Erreur lors de la connexion admin:', error);
-        res.status(500).send('Erreur serveur lors de la connexion.');
+        res.status(500).json({ message: 'Erreur serveur lors de la connexion.' });
     }
 });
 

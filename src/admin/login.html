@@ -86,19 +86,58 @@
     </div>
     <script>
         document.addEventListener('DOMContentLoaded', async () => {
-            // Afficher le message d'erreur du serveur
-            const errorMessage = document.getElementById('error-message');
+            const loginForm = document.querySelector('form');
+            const errorMessageElement = document.getElementById('error-message');
+            let csrfToken = '';
 
-            try {
-                const response = await fetch('/api/csrf-token');
-                const data = await response.json();
-                document.getElementById('csrf-token').value = data.csrfToken;
-            } catch (error) {
-                console.error('Erreur lors de la récupération du jeton CSRF:', error);
-                errorMessage.textContent = data.message || 'Erreur de sécurité: Impossible de charger le jeton CSRF.';
-                errorMessage.style.display = 'block';
-                //alert('Erreur de sécurité: Impossible de charger le jeton CSRF.');
+            // Fonction pour récupérer le jeton CSRF
+            async function getCsrfToken() {
+                try {
+                    const response = await fetch('/api/csrf-token');
+                    const data = await response.json();
+                    csrfToken = data.csrfToken;
+                    document.getElementById('csrf-token').value = csrfToken;
+                } catch (error) {
+                    console.error('Erreur lors de la récupération du jeton CSRF:', error);
+                    errorMessageElement.textContent = 'Erreur de sécurité: Impossible de charger le jeton CSRF.';
+                    errorMessageElement.style.display = 'block';
+                }
             }
+
+            // Gérer la soumission du formulaire
+            loginForm.addEventListener('submit', async (e) => {
+                e.preventDefault(); // Empêcher la soumission par défaut du formulaire
+
+                const username = loginForm.elements.username.value;
+                const password = loginForm.elements.password.value;
+
+                try {
+                    const response = await fetch('/admin/login', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'CSRF-Token': csrfToken // Inclure le jeton CSRF dans l'en-tête
+                        },
+                        body: JSON.stringify({ username, password, _csrf: csrfToken }) // Inclure le jeton CSRF dans le corps
+                    });
+
+                    if (response.ok) {
+                        // Connexion réussie, rediriger vers la page d'administration
+                        window.location.href = '/admin';
+                    } else {
+                        const errorData = await response.json(); // Tenter de parser la réponse JSON
+                        errorMessageElement.textContent = errorData.message || 'Erreur de connexion inconnue.';
+                        errorMessageElement.style.display = 'block';
+                    }
+                } catch (error) {
+                    console.error('Erreur lors de la connexion:', error);
+                    errorMessageElement.textContent = 'Une erreur est survenue lors de la connexion.';
+                    errorMessageElement.style.display = 'block';
+                }
+            });
+
+            // Récupérer le jeton CSRF au chargement de la page
+            getCsrfToken();
         });
     </script>
 </body>
