@@ -356,7 +356,7 @@
                 <span id="my-user-id">Chargement...</span>
             </div>
 
-            <h3>Utilisateurs Connectés</h3>
+            <h3>Utilisateurs Connectés (<span id="connected-users-count">0</span>)</h3>
             <!-- Conteneur pour la liste des autres utilisateurs -->
             <ul class="user-list" id="users-list">
                 <li style="color: #666; font-style: italic;">Aucun autre utilisateur en ligne.</li>
@@ -402,6 +402,7 @@
             const myUserIdSpan = document.getElementById('my-user-id');
             const myAvatarDiv = document.getElementById('my-avatar');
             const unreadMessagesBadge = document.getElementById('unread-messages-badge');
+            const connectedUsersCountSpan = document.getElementById('connected-users-count'); // Nouvel élément pour le compteur
             
             // Récupération des éléments du modal
             const confirmationModal = document.getElementById('confirmation-modal');
@@ -410,6 +411,23 @@
             
             let currentUserId = null; // Variable pour stocker l'ID local
             let unreadMessagesCount = 0; // Compteur de messages non lus
+
+            // Fonction pour afficher le modal (pour les alertes simples)
+            function showAlertModal(message, onConfirm = null) {
+                // Récupération des éléments du modal (s'ils ne sont pas déjà définis)
+                const modal = document.getElementById('confirmation-modal');
+                const modalP = modal.querySelector('p');
+                const confirmBtn = document.getElementById('confirm-quit');
+                const cancelBtn = document.getElementById('cancel-quit');
+
+                modalP.textContent = message;
+                modal.style.display = 'flex';
+                cancelBtn.style.display = 'none'; // Cache le bouton Annuler pour les alertes
+                confirmBtn.onclick = () => {
+                    modal.style.display = 'none';
+                    if (onConfirm) onConfirm();
+                };
+            }
 
             // Gérer la réception de l'ID utilisateur actuel du serveur
             socket.on('current user', function(username) {
@@ -458,6 +476,9 @@
                 
                 // Filtre l'utilisateur actuel et n'affiche que les autres
                 const otherUsers = users.filter(user => user !== currentUserId);
+
+                // Mettre à jour le compteur d'utilisateurs connectés
+                connectedUsersCountSpan.textContent = users.length;
 
                 if (otherUsers.length === 0) {
                     const item = document.createElement('li');
@@ -555,6 +576,13 @@
                 if (err.message === 'Non autorisé') {
                     window.location.href = '/login.html'; // Rediriger vers la page de connexion
                 }
+            });
+
+            // Gérer l'événement de déconnexion forcée
+            socket.on('force_disconnect', (message) => {
+                showAlertModal(message, () => {
+                    window.location.href = '/logout'; // Rediriger vers la page de déconnexion
+                });
             });
         }); // Fin de DOMContentLoaded
     </script>

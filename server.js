@@ -66,6 +66,8 @@ let mongoClientInstance; // Variable pour stocker l'instance du client MongoDB
 
 // Utiliser un Set pour garantir l'unicité des IDs d'utilisateur connectés
 const connectedUsers = new Set();
+// Objet pour stocker les sockets actifs par userId, permettant de gérer les connexions uniques
+const userSockets = {}; 
 
 // Middleware pour vérifier l'authentification pour les routes protégées (admin)
 function isAuthenticated(req, res, next) {
@@ -424,6 +426,18 @@ function startServer() {
     const user = socket.request.user; // Récupérer l'utilisateur authentifié
     const userId = user.username; // Utiliser le pseudo comme ID utilisateur
 
+    // Gérer la connexion unique: déconnecter l'ancien socket si l'utilisateur se connecte ailleurs
+    if (userSockets[userId] && userSockets[userId] !== socket.id) {
+        console.log(`Déconnexion forcée de l'ancien socket pour ${userId}: ${userSockets[userId]}`);
+        io.to(userSockets[userId]).emit('force_disconnect', 'Vous avez été connecté sur une autre machine.');
+        // Optionnel: forcer la déconnexion côté serveur de l'ancien socket
+        const oldSocket = io.sockets.sockets.get(userSockets[userId]);
+        if (oldSocket) {
+            oldSocket.disconnect(true);
+        }
+    }
+    userSockets[userId] = socket.id; // Enregistrer le nouveau socket de l'utilisateur
+
     connectedUsers.add(userId);
 
     console.log(`Utilisateur connecté: ${userId} (${socket.id})`);
@@ -490,6 +504,10 @@ function startServer() {
     // 4. Gérer la déconnexion
     socket.on('disconnect', () => {
         connectedUsers.delete(userId);
+        // Supprimer l'entrée de userSockets si le socket déconnecté est celui enregistré
+        if (userSockets[userId] === socket.id) {
+            delete userSockets[userId];
+        }
         console.log(`Utilisateur déconnecté: ${userId} (${socket.id})`);
         
         const systemLeaveMsg = {
