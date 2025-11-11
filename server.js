@@ -1,7 +1,7 @@
 const express = require('express');
 const { createServer } = require('http');
 const { Server } = require('socket.io');
-const { MongoClient } = require('mongodb');
+const { MongoClient, ObjectId } = require('mongodb'); // Ajout de ObjectId
 const path = require('path');
 const bcrypt = require('bcrypt');
 const session = require('express-session');
@@ -272,9 +272,14 @@ app.post('/api/admin/users', isAdmin, async (req, res) => {
 app.delete('/api/admin/users/:id', isAdmin, async (req, res) => {
     const { id } = req.params;
 
+    // Valider si l'ID est un ObjectId MongoDB valide
+    if (!ObjectId.isValid(id)) {
+        return res.status(400).json({ message: 'ID utilisateur invalide.' });
+    }
+
     try {
         const usersCollection = db.collection(USERS_COLLECTION_NAME);
-        const result = await usersCollection.deleteOne({ _id: new MongoClient.ObjectId(id) });
+        const result = await usersCollection.deleteOne({ _id: new ObjectId(id) });
 
         if (result.deletedCount === 0) {
             return res.status(404).json({ message: 'Utilisateur non trouvé.' });
@@ -295,12 +300,22 @@ app.get('/admin/edit-user', isAuthenticated, isAdmin, (req, res) => {
 // API pour récupérer un utilisateur par son ID (pour le formulaire de modification)
 app.get('/api/admin/users/:id', isAuthenticated, isAdmin, async (req, res) => {
     const { id } = req.params;
+    console.log(`Serveur: Requête GET pour l'utilisateur avec ID: ${id}`); // Log l'ID reçu
+
+    // Valider si l'ID est un ObjectId MongoDB valide
+    if (!ObjectId.isValid(id)) {
+        console.log(`Serveur: ID utilisateur invalide: ${id}`); // Log si l'ID est invalide
+        return res.status(400).json({ message: 'ID utilisateur invalide.' });
+    }
+
     try {
         const usersCollection = db.collection(USERS_COLLECTION_NAME);
-        const user = await usersCollection.findOne({ _id: new MongoClient.ObjectId(id) }, { projection: { password: 0 } });
+        const user = await usersCollection.findOne({ _id: new ObjectId(id) }, { projection: { password: 0 } });
         if (!user) {
+            console.log(`Serveur: Utilisateur non trouvé pour l'ID: ${id}`); // Log si l'utilisateur n'est pas trouvé
             return res.status(404).json({ message: 'Utilisateur non trouvé.' });
         }
+        console.log(`Serveur: Utilisateur trouvé: ${user.username}`); // Log l'utilisateur trouvé
         res.status(200).json(user);
     } catch (error) {
         console.error('Erreur lors de la récupération de l\'utilisateur:', error);
@@ -312,6 +327,11 @@ app.get('/api/admin/users/:id', isAuthenticated, isAdmin, async (req, res) => {
 app.put('/api/admin/users/:id', isAuthenticated, isAdmin, async (req, res) => {
     const { id } = req.params;
     const { username, password, role } = req.body;
+
+    // Valider si l'ID est un ObjectId MongoDB valide
+    if (!ObjectId.isValid(id)) {
+        return res.status(400).json({ message: 'ID utilisateur invalide.' });
+    }
 
     // Validation des entrées
     if (!username || typeof username !== 'string' || username.trim().length === 0) {
@@ -333,7 +353,7 @@ app.put('/api/admin/users/:id', isAuthenticated, isAdmin, async (req, res) => {
         }
 
         const result = await usersCollection.updateOne(
-            { _id: new MongoClient.ObjectId(id) },
+            { _id: new ObjectId(id) },
             { $set: updateData }
         );
 
