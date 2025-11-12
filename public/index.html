@@ -105,7 +105,7 @@
                 top: 120px; /* Sous la barre principale (70px) et la barre secondaire (50px) */
                 right: -350px; /* Caché par défaut à droite */
                 width: 250px;
-                height: calc(100% - 100px - 100px); /* Hauteur totale - header (70px) - secondary nav (50px) - form (80px) */
+                height: calc(100% - 230px);  /* Hauteur totale - header (70px) - secondary nav (50px) - form message (70px) - autres (40px)*/
                 z-index: 999; /* Au-dessus du contenu principal */
                 box-shadow: -2px 0 5px rgba(0,0,0,0.2);
                 transition: right 0.3s ease-in-out; /* Animation de transition */
@@ -234,7 +234,8 @@
             background: #e0e0e0;
             padding: 10px 20px;
             display: flex; 
-            height: 100px; 
+            min-height: 70px; /* Hauteur minimale pour le formulaire */
+            align-items: center; /* Centre verticalement les éléments */
             box-sizing: border-box; 
             border-top: 1px solid #ccc;
         }
@@ -244,6 +245,7 @@
             flex-grow: 1; 
             border-radius: 20px; /* Coins arrondis pour l'input */
             margin-right: 10px;
+            min-height: 40px; /* Hauteur ajustée à 30px */
         }
         #input:focus { outline: 2px solid #3f51b5; border-color: transparent; }
         #form > button { 
@@ -254,6 +256,7 @@
             color: #fff; 
             cursor: pointer;
             font-weight: bold;
+            min-height: 40px; /* Hauteur ajustée à 30px */
         }
         #form > button:hover { background: #303f9f; }
         
@@ -370,7 +373,6 @@
         #current-user-profile .avatar {
             width: 50px;
             height: 50px;
-            /* background-color: #00bcd4; Bleu ciel pour le profil */
             font-size: 1.2em;
             background-image: url('images/default_avatar_v1.png'); /* Image par défaut */
             background-size: cover; 
