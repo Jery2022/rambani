@@ -342,6 +342,9 @@
             width: 30px;
             height: 30px;
             border-radius: 50%;
+            background-image: url('images/default_avatar.png'); /* Image par défaut */
+            background-size: cover; 
+            background-position: center;
             background-color: #3f51b5;
             display: flex;
             justify-content: center;
@@ -367,8 +370,11 @@
         #current-user-profile .avatar {
             width: 50px;
             height: 50px;
-            background-color: #00bcd4; /* Bleu ciel pour le profil */
+            /* background-color: #00bcd4; Bleu ciel pour le profil */
             font-size: 1.2em;
+            background-image: url('images/default_avatar_v1.png'); /* Image par défaut */
+            background-size: cover; 
+            background-position: center;
         }
 
         #current-user-profile span {
@@ -467,7 +473,7 @@
         <aside id="user-sidebar">
             <div id="current-user-profile">
                 <!-- L'ID sera injecté ici par JS -->
-                <div class="avatar" id="my-avatar"> M</div> 
+                <div class="avatar" id="my-avatar"> </div> 
                 <span id="my-user-id">Chargement...</span>
             </div>
 
@@ -549,8 +555,8 @@
             // Gérer la réception de l'ID utilisateur actuel du serveur
             socket.on('current user', function(username) {
                 currentUserId = username;
-                myUserIdSpan.textContent = currentUserId + " (Moi)";
-                myAvatarDiv.textContent = currentUserId.charAt(0).toUpperCase();
+                myUserIdSpan.textContent = " - " + currentUserId + " (Moi)";
+                // myAvatarDiv.textContent = currentUserId.charAt(0).toUpperCase();
             });
 
             // Fonction utilitaire pour mettre à jour le badge de messages non lus
@@ -610,7 +616,7 @@
                     const item = document.createElement('li');
                     item.className = 'user-item';
                     item.innerHTML = `
-                        <div class="avatar">${user.charAt(0)}</div>
+                        <div class="avatar"></div>
                         <span>${user}</span>
                     `;
                     usersList.appendChild(item);
