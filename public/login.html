@@ -13,7 +13,9 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
+            min-height: 100vh; /* Utiliser min-height pour permettre le défilement si nécessaire */
+            padding: 20px; /* Espacement standard en haut et en bas */
+            box-sizing: border-box; /* Inclure le padding dans la hauteur totale */
             color: #333;
         }
         .login-container {
@@ -24,6 +26,8 @@
             width: 100%;
             max-width: 400px;
             text-align: center;
+            /* max-height: calc(100vh - 40px); */ /* Retiré pour éviter le défilement */
+            /* overflow-y: auto; */ /* Retiré pour éviter le défilement */
         }
 
         /* Responsive adjustments */
@@ -31,6 +35,7 @@
             .login-container {
                 margin: 20px;
                 padding: 30px;
+                /* max-height: calc(100vh - 40px); */ /* Retiré pour éviter le défilement */
             }
             .login-container h1 {
                 font-size: 1.8rem;
@@ -45,12 +50,14 @@
             body {
                 align-items: flex-start; /* Aligner en haut pour les petits écrans */
                 padding-top: 20px;
+                padding-bottom: 20px; /* Assurer l'espacement en bas */
             }
             .login-container {
                 margin: 10px;
                 padding: 20px;
                 border-radius: 5px;
                 box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                /* max-height: calc(100vh - 40px); */ /* Retiré pour éviter le défilement */
             }
             .login-container h1 {
                 font-size: 1.5rem;
