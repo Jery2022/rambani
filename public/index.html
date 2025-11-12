@@ -442,6 +442,28 @@
             background-color: #bbb;
         }
 
+        /* Styles pour la modale de succès */
+        #success-modal .modal-content {
+            background-color: #e8f5e9; /* Vert très clair */
+            border: 1px solid #a5d6a7; /* Bordure verte */
+        }
+
+        #success-modal-ok-button {
+            background-color: #4caf50; /* Vert */
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: bold;
+            transition: background-color 0.2s;
+            margin-top: 15px;
+        }
+
+        #success-modal-ok-button:hover {
+            background-color: #388e3c; /* Vert plus foncé au survol */
+        }
       
     </style>
 </head>
@@ -467,6 +489,7 @@
         <!-- Barre de Navigation Secondaire -->
         <nav id="secondary-nav">
             <button id="sidebar-toggle-button"><i class="fa-solid fa-bars"></i></button> <!-- Icône pour ouvrir/fermer la sidebar -->
+            <button id="open-profile-modal-button" style="background: none; border: none; color: white; font-size: 1.1rem; cursor: pointer; margin-left: 20px;"><i class="fa-solid fa-user-edit"></i> Mon Profil</button>
         </nav>
 
         <!-- Colonne Latérale (Sidebar) - Liste des Utilisateurs -->
@@ -508,7 +531,20 @@
     </div>
     <!-- FIN MODAL -->
 
-    <script src="/socket.io/socket.io.js"></script> 
+    <!-- Modale de mise à jour du profil -->
+    <div id="profile-update-modal-container"></div>
+    <!-- FIN Modale de mise à jour du profil -->
+
+    <!-- Modale de succès générique -->
+    <div id="success-modal" class="modal">
+        <div class="modal-content">
+            <p id="success-modal-message"></p>
+            <button id="success-modal-ok-button">OK</button>
+        </div>
+    </div>
+    <!-- FIN Modale de succès générique -->
+
+    <script src="/socket.io/socket.io.js"></script>
     
     <script>
         // Encapsulation du code dans l'événement DOMContentLoaded pour garantir que la librairie Socket.IO est chargée
@@ -531,32 +567,59 @@
             const confirmationModal = document.getElementById('confirmation-modal');
             const confirmQuitButton = document.getElementById('confirm-quit');
             const cancelQuitButton = document.getElementById('cancel-quit');
+
+            // Récupération des éléments de la modale de profil
+            const profileUpdateModalContainer = document.getElementById('profile-update-modal-container');
+            const openProfileModalButton = document.getElementById('open-profile-modal-button');
+            let profileUpdateModal; // Sera défini après le chargement du contenu
+            let closeProfileModalButton;
+            let profileUpdateForm;
+                    let firstNameInput, lastNameInput, usernameInput, emailInput, profilePictureInput, currentProfilePictureImg, csrfTokenInput, profileErrorMessage, cancelProfileUpdateButton;
             
-            let currentUserId = null; // Variable pour stocker l'ID local
-            let unreadMessagesCount = 0; // Compteur de messages non lus
+                    let currentUserId = null; // Variable pour stocker l'ID local
+                    let unreadMessagesCount = 0; // Compteur de messages non lus
 
-            // Fonction pour afficher le modal (pour les alertes simples)
-            function showAlertModal(message, onConfirm = null) {
-                // Récupération des éléments du modal (s'ils ne sont pas déjà définis)
-                const modal = document.getElementById('confirmation-modal');
-                const modalP = modal.querySelector('p');
-                const confirmBtn = document.getElementById('confirm-quit');
-                const cancelBtn = document.getElementById('cancel-quit');
+            // Récupération des éléments de la modale de succès
+            const successModal = document.getElementById('success-modal');
+            const successModalMessage = document.getElementById('success-modal-message');
+            const successModalOkButton = document.getElementById('success-modal-ok-button');
 
-                modalP.textContent = message;
+            // Fonction pour afficher le modal (pour les alertes simples ou succès)
+            function showAlertModal(message, onOk = null, isError = false) {
+                const modal = isError ? confirmationModal : successModal;
+                const messageElement = isError ? modal.querySelector('p') : successModalMessage;
+                const okButton = isError ? document.getElementById('confirm-quit') : successModalOkButton;
+                const cancelButton = document.getElementById('cancel-quit');
+
+                messageElement.textContent = message;
                 modal.style.display = 'flex';
-                cancelBtn.style.display = 'none'; // Cache le bouton Annuler pour les alertes
-                confirmBtn.onclick = () => {
-                    modal.style.display = 'none';
-                    if (onConfirm) onConfirm();
-                };
+
+                if (isError) {
+                    cancelButton.style.display = 'none'; // Cache le bouton Annuler pour les erreurs
+                    okButton.textContent = 'OK';
+                    okButton.onclick = () => {
+                        modal.style.display = 'none';
+                        if (onOk) onOk();
+                    };
+                } else {
+                    // Pour la modale de succès, on cache le bouton de confirmation du modal d'erreur
+                    confirmationModal.style.display = 'none'; 
+                    okButton.onclick = () => {
+                        modal.style.display = 'none';
+                        if (onOk) onOk();
+                    };
+                }
             }
 
-            // Gérer la réception de l'ID utilisateur actuel du serveur
-            socket.on('current user', function(username) {
-                currentUserId = username;
+            // Gérer la réception de l'ID utilisateur actuel du serveur et des informations de profil
+            socket.on('current user', function(userProfile) {
+                currentUserId = userProfile.username;
                 myUserIdSpan.textContent = " - " + currentUserId + " (Moi)";
-                // myAvatarDiv.textContent = currentUserId.charAt(0).toUpperCase();
+                if (userProfile.profilePicture) {
+                    myAvatarDiv.style.backgroundImage = `url('${userProfile.profilePicture}')`;
+                } else {
+                    myAvatarDiv.style.backgroundImage = `url('images/default_avatar_v1.png')`; // Fallback
+                }
             });
 
             // Fonction utilitaire pour mettre à jour le badge de messages non lus
@@ -592,16 +655,14 @@
             }
             
             // Fonction utilitaire pour mettre à jour la liste des utilisateurs
-            function updateUsersList(users) {
-                // L'ID utilisateur est maintenant défini par le serveur via l'événement 'current user'
-                // Cette section n'a plus besoin de générer un ID local
+            function updateUsersList(userProfiles) {
                 usersList.innerHTML = ''; // Vide la liste
                 
                 // Filtre l'utilisateur actuel et n'affiche que les autres
-                const otherUsers = users.filter(user => user !== currentUserId);
+                const otherUsers = userProfiles.filter(user => user.username !== currentUserId);
 
                 // Mettre à jour le compteur d'utilisateurs connectés
-                connectedUsersCountSpan.textContent = users.length;
+                connectedUsersCountSpan.textContent = userProfiles.length;
 
                 if (otherUsers.length === 0) {
                     const item = document.createElement('li');
@@ -616,12 +677,140 @@
                     const item = document.createElement('li');
                     item.className = 'user-item';
                     item.innerHTML = `
-                        <div class="avatar"></div>
-                        <span>${user}</span>
+                        <div class="avatar" style="background-image: url('${user.profilePicture || 'images/default_avatar.png'}');"></div>
+                        <span>${user.username}</span>
                     `;
                     usersList.appendChild(item);
                 });
             }
+
+            // ----------------------------------------------------
+            // LOGIQUE DE LA MODALE DE PROFIL
+            // ----------------------------------------------------
+
+            // Charger le contenu de la modale de profil
+            fetch('/profile-modal.html')
+                .then(response => response.text())
+                .then(html => {
+                    profileUpdateModalContainer.innerHTML = html;
+                    profileUpdateModal = document.getElementById('profile-update-modal');
+                    closeProfileModalButton = profileUpdateModal.querySelector('.close-button');
+                    profileUpdateForm = document.getElementById('profile-update-form');
+                    firstNameInput = document.getElementById('first-name');
+                    lastNameInput = document.getElementById('last-name');
+                    usernameInput = document.getElementById('username');
+                    emailInput = document.getElementById('email');
+                    profilePictureInput = document.getElementById('profile-picture');
+                    currentProfilePictureImg = document.getElementById('current-profile-picture');
+                    csrfTokenInput = document.getElementById('csrf-token'); // Récupérer le champ CSRF
+                    profileErrorMessage = document.getElementById('profile-error-message'); // Récupérer l'élément d'erreur
+                    cancelProfileUpdateButton = document.getElementById('cancel-profile-update'); // Récupérer le bouton Annuler
+
+                    // Fonction pour charger le jeton CSRF et les données du profil
+                    const loadProfileDataAndCsrf = async () => {
+                        try {
+                            // Récupérer le jeton CSRF
+                            const csrfRes = await fetch('/api/csrf-token');
+                            const csrfData = await csrfRes.json();
+                            if (csrfData.csrfToken) {
+                                csrfTokenInput.value = csrfData.csrfToken;
+                            } else {
+                                showAlertModal('Erreur: Jeton CSRF non reçu.');
+                                return;
+                            }
+
+                            // Charger les données du profil existant
+                            const profileRes = await fetch('/api/profile');
+                            const profileData = await profileRes.json();
+
+                            if (profileData.success) {
+                                firstNameInput.value = profileData.profile.firstName || '';
+                                lastNameInput.value = profileData.profile.lastName || '';
+                                usernameInput.value = profileData.profile.username || '';
+                                emailInput.value = profileData.profile.email || '';
+                                if (profileData.profile.profilePicture) {
+                                    currentProfilePictureImg.src = profileData.profile.profilePicture;
+                                    currentProfilePictureImg.style.display = 'block';
+                                } else {
+                                    currentProfilePictureImg.style.display = 'none';
+                                }
+                            } else {
+                                showAlertModal('Erreur lors du chargement du profil: ' + profileData.message);
+                            }
+                        } catch (error) {
+                            console.error('Erreur:', error);
+                            profileErrorMessage.textContent = 'Erreur réseau lors du chargement du profil ou du jeton CSRF.';
+                            profileErrorMessage.style.display = 'block';
+                        }
+                    };
+
+                    // Ouvrir la modale
+                    openProfileModalButton.addEventListener('click', () => {
+                        profileUpdateModal.style.display = 'flex';
+                        profileErrorMessage.textContent = ''; // Effacer les messages d'erreur précédents
+                        profileErrorMessage.style.display = 'none';
+                        loadProfileDataAndCsrf(); // Charger les données et le jeton CSRF
+                    });
+
+                    // Fermer la modale via le bouton "X"
+                    closeProfileModalButton.addEventListener('click', () => {
+                        profileUpdateModal.style.display = 'none';
+                    });
+
+                    // Fermer la modale via le bouton "Annuler"
+                    cancelProfileUpdateButton.addEventListener('click', () => {
+                        profileUpdateModal.style.display = 'none';
+                    });
+
+                    // Fermer la modale si l'utilisateur clique en dehors
+                    window.addEventListener('click', (event) => {
+                        if (event.target === profileUpdateModal) {
+                            profileUpdateModal.style.display = 'none';
+                        }
+                    });
+
+                    // Gérer la soumission du formulaire de mise à jour du profil
+                    profileUpdateForm.addEventListener('submit', async (e) => {
+                        e.preventDefault();
+                        const formData = new FormData(profileUpdateForm);
+
+                        try {
+                            const response = await fetch('/api/profile', {
+                                method: 'PUT',
+                                body: formData
+                            });
+                            const result = await response.json();
+                            console.log('Résultat de la mise à jour du profil:', result); // Ajout d'un log
+
+                            if (result.success) {
+                                showAlertModal('Profil mis à jour avec succès !', () => {
+                                    profileUpdateModal.style.display = 'none';
+                                    window.location.href = '/'; // Rediriger vers la session de chat
+                                });
+                                // Mettre à jour l'avatar et le nom d'utilisateur dans la sidebar si nécessaire
+                                if (result.profile.username) {
+                                    myUserIdSpan.textContent = " - " + result.profile.username + " (Moi)";
+                                }
+                                if (result.profile.profilePicture) {
+                                    myAvatarDiv.style.backgroundImage = `url('${result.profile.profilePicture}')`;
+                                }
+                            } else {
+                                profileErrorMessage.textContent = result.message;
+                                profileErrorMessage.style.display = 'block';
+                            }
+                        } catch (error) {
+                            console.error('Erreur:', error);
+                            profileErrorMessage.textContent = 'Erreur réseau lors de la mise à jour du profil.';
+                            profileErrorMessage.style.display = 'block';
+                        }
+                    });
+                })
+                .catch(error => {
+                    console.error('Erreur lors du chargement de la modale de profil:', error);
+                    profileErrorMessage.textContent = 'Erreur lors du chargement de la modale de profil.';
+                    profileErrorMessage.style.display = 'block';
+                });
+
 
             // ----------------------------------------------------
             // LOGIQUE ÉVÉNEMENTIELLE
@@ -726,6 +915,19 @@
                 showAlertModal(message, () => {
                     window.location.href = '/logout'; // Rediriger vers la page de déconnexion
                 });
+            });
+
+            // Gérer l'événement de mise à jour du profil
+            socket.on('profile_updated', (data) => {
+                if (data.userId === currentUserId) {
+                    // Mettre à jour l'avatar et le nom d'utilisateur dans la sidebar
+                    if (data.profile.username) {
+                        myUserIdSpan.textContent = " - " + data.profile.username + " (Moi)";
+                    }
+                    if (data.profile.profilePicture) {
+                        myAvatarDiv.style.backgroundImage = `url('${data.profile.profilePicture}')`;
+                    }
+                }
             });
         }); // Fin de DOMContentLoaded
     </script>
