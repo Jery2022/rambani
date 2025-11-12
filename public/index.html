@@ -384,7 +384,7 @@
         }
 
         /* ---------------------------------------------------- */
-        /* MODAL DE CONFIRMATION (REMPLACEMENT DE CONFIRM()) */
+        /* MODAL DE CONFIRMATION */
         /* ---------------------------------------------------- */
         #confirmation-modal {
             display: none;
@@ -446,6 +446,15 @@
         #success-modal .modal-content {
             background-color: #e8f5e9; /* Vert très clair */
             border: 1px solid #a5d6a7; /* Bordure verte */
+            /* Réutilise les styles de base de .modal-content de profile-modal.html */
+            margin: auto;
+            padding: 20px;
+            width: 80%;
+            max-width: 500px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            position: relative;
+            text-align: center; /* Centre le texte dans la modale de succès */
         }
 
         #success-modal-ok-button {
@@ -519,7 +528,7 @@
         </main>
     </div>
     
-    <!-- MODAL DE CONFIRMATION (Remplacement de confirm()) -->
+    <!-- MODAL DE CONFIRMATION -->
     <div id="confirmation-modal">
         <div>
             <p>Êtes-vous sûr de vouloir quitter le chat ?</p>
@@ -536,7 +545,7 @@
     <!-- FIN Modale de mise à jour du profil -->
 
     <!-- Modale de succès générique -->
-    <div id="success-modal" class="modal">
+    <div id="success-modal" class="modal" style="display: none;">
         <div class="modal-content">
             <p id="success-modal-message"></p>
             <button id="success-modal-ok-button">OK</button>
@@ -574,10 +583,10 @@
             let profileUpdateModal; // Sera défini après le chargement du contenu
             let closeProfileModalButton;
             let profileUpdateForm;
-                    let firstNameInput, lastNameInput, usernameInput, emailInput, profilePictureInput, currentProfilePictureImg, csrfTokenInput, profileErrorMessage, cancelProfileUpdateButton;
-            
-                    let currentUserId = null; // Variable pour stocker l'ID local
-                    let unreadMessagesCount = 0; // Compteur de messages non lus
+            let firstNameInput, lastNameInput, usernameInput, emailInput, profilePictureInput, currentProfilePictureImg, csrfTokenInput, profileErrorMessage, cancelProfileUpdateButton;
+    
+            let currentUserId = null; // Variable pour stocker l'ID local
+            let unreadMessagesCount = 0; // Compteur de messages non lus
 
             // Récupération des éléments de la modale de succès
             const successModal = document.getElementById('success-modal');
@@ -586,26 +595,22 @@
 
             // Fonction pour afficher le modal (pour les alertes simples ou succès)
             function showAlertModal(message, onOk = null, isError = false) {
-                const modal = isError ? confirmationModal : successModal;
-                const messageElement = isError ? modal.querySelector('p') : successModalMessage;
-                const okButton = isError ? document.getElementById('confirm-quit') : successModalOkButton;
-                const cancelButton = document.getElementById('cancel-quit');
-
-                messageElement.textContent = message;
-                modal.style.display = 'flex';
-
                 if (isError) {
-                    cancelButton.style.display = 'none'; // Cache le bouton Annuler pour les erreurs
-                    okButton.textContent = 'OK';
-                    okButton.onclick = () => {
-                        modal.style.display = 'none';
+                    // Utilise la modale de confirmation pour les erreurs
+                    confirmationModal.querySelector('p').textContent = message;
+                    confirmationModal.querySelector('#confirm-quit').textContent = 'OK';
+                    confirmationModal.querySelector('#cancel-quit').style.display = 'none'; // Cache le bouton Annuler
+                    confirmationModal.style.display = 'flex';
+                    confirmationModal.querySelector('#confirm-quit').onclick = () => {
+                        confirmationModal.style.display = 'none';
                         if (onOk) onOk();
                     };
                 } else {
-                    // Pour la modale de succès, on cache le bouton de confirmation du modal d'erreur
-                    confirmationModal.style.display = 'none'; 
-                    okButton.onclick = () => {
-                        modal.style.display = 'none';
+                    // Utilise la modale de succès pour les succès
+                    successModalMessage.textContent = message;
+                    successModal.style.display = 'flex';
+                    successModalOkButton.onclick = () => {
+                        successModal.style.display = 'none';
                         if (onOk) onOk();
                     };
                 }
