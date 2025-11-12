@@ -1,0 +1,139 @@
+<div id="profile-update-modal" class="modal">
+    <div class="modal-content">
+        <span class="close-button">&times;</span>
+        <h2>Mettre à jour le profil</h2>
+        <form id="profile-update-form" enctype="multipart/form-data">
+            <input type="hidden" id="csrf-token" name="_csrf" value="">
+            <div class="form-group">
+                <label for="first-name">Prénom:</label>
+                <input type="text" id="first-name" name="firstName" required>
+            </div>
+            <div class="form-group">
+                <label for="last-name">Nom:</label>
+                <input type="text" id="last-name" name="lastName" required>
+            </div>
+            <div class="form-group">
+                <label for="username">Nom d'utilisateur:</label>
+                <input type="text" id="username" name="username" required>
+            </div>
+            <div class="form-group">
+                <label for="email">Email:</label>
+                <input type="email" id="email" name="email" required>
+            </div>
+            <div class="form-group">
+                <label for="profile-picture">Photo de profil:</label>
+            <input type="file" id="profile-picture" name="profilePicture" accept="image/*">
+                <img id="current-profile-picture" src="" alt="Photo de profil actuelle" style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover; margin-top: 10px; display: none;">
+            </div>
+            <div id="profile-error-message" class="error-message" ></div>
+            <button type="submit" class="form-button">Enregistrer les modifications</button>
+            <button type="button" id="cancel-profile-update" class="form-button">Annuler</button>
+        </form>
+    </div>
+</div>
+
+<style>
+    /* Styles pour la modale */
+    .modal {
+        display: none; /* Caché par défaut */
+        position: fixed; /* Reste en place */
+        z-index: 1001; /* Au-dessus de tout */
+        left: 0;
+        top: 0;
+        width: 100%; /* Pleine largeur */
+        height: 100%; /* Pleine hauteur */
+        overflow: auto; /* Active le défilement si nécessaire */
+        background-color: rgba(0,0,0,0.4); /* Fond semi-transparent noir */
+        justify-content: center; /* Centre horizontalement */
+        align-items: center; /* Centre verticalement */
+    }
+
+    .modal-content {
+        background-color: #fefefe;
+        margin: auto; /* Centre la modale */
+        padding: 20px;
+        border: 1px solid #888;
+        width: 80%; /* Largeur de la modale */
+        max-width: 500px; /* Largeur maximale */
+        border-radius: 8px;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        position: relative;
+    }
+
+    .close-button {
+        color: #aaa;
+        float: right;
+        font-size: 28px;
+        font-weight: bold;
+        position: absolute;
+        top: 10px;
+        right: 20px;
+    }
+
+    .close-button:hover,
+    .close-button:focus {
+        color: black;
+        text-decoration: none;
+        cursor: pointer;
+    }
+
+    .form-group {
+        margin-bottom: 15px;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+        color: #333;
+    }
+
+    .form-group input[type="text"],
+    .form-group input[type="email"] {
+        width: calc(100% - 22px); /* Prend en compte le padding et la bordure */
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-size: 1rem;
+    }
+
+    .form-group input[type="file"] {
+        padding: 5px 0;
+    }
+  .error-message {
+        color: #f44336;
+        margin-top: 15px;
+        margin-bottom: 15px;
+        text-align: center;
+        font-weight: bold;
+        display: none; /* Caché par défaut */
+    }
+    .form-button {
+        color: white;
+        padding: 10px 20px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 1rem;
+        font-weight: bold;
+        transition: background-color 0.2s;
+        width: 100%; /* Pour que les boutons aient la même largeur */
+        margin-top: 10px; /* Pour espacer les boutons */
+    }
+
+    button[type="submit"] {
+        background-color: #3f51b5;
+    }
+
+    button[type="submit"]:hover {
+        background-color: #303f9f;
+    }
+
+    #cancel-profile-update {
+        background-color: #f44336;
+    }
+
+    #cancel-profile-update:hover {
+        background-color: #d32f2f;
+    }
+</style>

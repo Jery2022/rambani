@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chat Privé</title>
+    <title>Rambani - Chat Privé</title>
     <!-- Inclure Font Awesome pour les icônes (facultatif mais recommandé pour l'esthétique) -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
@@ -20,17 +20,125 @@
         /* Conteneur principal pour le chat et la barre latérale */
         #main-container {
             display: grid;
-            grid-template-columns: 1fr 250px; /* Chat principal (1fr) + Sidebar (250px) */
-            grid-template-rows: 70px 1fr; /* Barre du haut (70px) + Contenu principal */
+            grid-template-columns: 1fr 250px; /* Desktop/Tablet: Chat principal (1fr) + Sidebar (250px) */
+            grid-template-rows: 70px 50px 1fr; /* Barre du haut (70px) + Barre secondaire (50px) + Contenu principal */
             height: 100%;
             width: 100%;
         }
 
         /* ---------------------------------------------------- */
+        /* BARRE DE NAVIGATION SECONDAIRE */
+        /* ---------------------------------------------------- */
+        #secondary-nav {
+            grid-column: 1 / 3; /* S'étend sur les deux colonnes */
+            grid-row: 2 / 3; /* Sous la barre principale */
+            background-color: #5c6bc0; /* Bleu légèrement plus clair */
+            color: white;
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            z-index: 9; /* Juste en dessous de la barre principale */
+        }
+
+        #secondary-nav #sidebar-toggle-button {
+            margin-right: 0; /* Réinitialise la marge du bouton */
+        }
+
+        /* ---------------------------------------------------- */
+        /* BARRE DE NAVIGATION SECONDAIRE */
+        /* ---------------------------------------------------- */
+        #secondary-nav {
+            grid-column: 1 / 3; /* S'étend sur les deux colonnes */
+            grid-row: 2 / 3; /* Sous la barre principale */
+            background-color: #5c6bc0; /* Bleu légèrement plus clair */
+            color: white;
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            z-index: 9; /* Juste en dessous de la barre principale */
+        }
+
+        #secondary-nav #sidebar-toggle-button {
+            margin-right: 0; /* Réinitialise la marge du bouton */
+        }
+
+        /* ---------------------------------------------------- */
+        /* BOUTON TOGGLE SIDEBAR (MOBILE) */
+        /* ---------------------------------------------------- */
+        #sidebar-toggle-button {
+            display: none; /* Caché par défaut */
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+            margin-right: 15px;
+        }
+
+        /* ---------------------------------------------------- */
+        /* MEDIA QUERIES POUR LA RÉACTIVITÉ */
+        /* ---------------------------------------------------- */
+        @media (max-width: 768px) { /* Pour les tablettes et mobiles */
+            #main-container {
+                grid-template-columns: 1fr; /* Une seule colonne pour le chat */
+            }
+
+            #chat-header {
+                grid-column: 1 / 2; /* S'étend sur la seule colonne */
+            }
+
+            #secondary-nav {
+                grid-column: 1 / 2; /* S'étend sur la seule colonne */
+            }
+
+            #chat-area {
+                grid-column: 1 / 2;
+                grid-row: 3 / 4; /* Occupe la troisième ligne */
+            }
+
+            #user-sidebar {
+                grid-column: 1 / 2; /* S'étend sur la seule colonne */
+                grid-row: 3 / 4; /* Occupe la même ligne que la zone de chat */
+                position: fixed; /* Position fixe pour l'overlay */
+                top: 120px; /* Sous la barre principale (70px) et la barre secondaire (50px) */
+                right: -350px; /* Caché par défaut à droite */
+                width: 250px;
+                height: calc(100% - 100px - 100px); /* Hauteur totale - header (70px) - secondary nav (50px) - form (80px) */
+                z-index: 999; /* Au-dessus du contenu principal */
+                box-shadow: -2px 0 5px rgba(0,0,0,0.2);
+                transition: right 0.3s ease-in-out; /* Animation de transition */
+            }
+
+            #user-sidebar.active {
+                right: 0; /* Affiche la sidebar */
+            }
+
+            #sidebar-toggle-button {
+                display: block; /* Affiche le bouton sur mobile/tablette */
+            }
+        }
+
+        @media (max-width: 480px) { /* Pour les petits mobiles */
+            #chat-header h1 {
+                font-size: 1.4rem;
+            }
+            #quit-button {
+                padding: 6px 10px;
+                font-size: 0.9rem;
+            }
+            #sidebar-toggle-button {
+                font-size: 1.3rem;
+                display: block; /* S'assure que le bouton est visible en mode mobile */
+            }
+        }
+        /* ---------------------------------------------------- */
         /* BARRE SUPÉRIEURE (HEADER) */
         /* ---------------------------------------------------- */
         #chat-header {
             grid-column: 1 / 3; /* S'étend sur les deux colonnes */
+            grid-row: 1 / 2; /* Première ligne */
             background-color: #3f51b5; /* Bleu primaire */
             color: white;
             padding: 0 20px;
@@ -106,7 +214,7 @@
         /* ---------------------------------------------------- */
         #chat-area {
             grid-column: 1 / 2;
-            grid-row: 2 / 3;
+            grid-row: 3 / 4; /* Occupe la troisième ligne */
             display: flex;
             flex-direction: column;
             overflow: hidden;
@@ -132,7 +240,7 @@
         }
         #input { 
             border: 1px solid #ccc;
-            padding: 0 1rem; 
+            padding: 0 1.2rem; 
             flex-grow: 1; 
             border-radius: 20px; /* Coins arrondis pour l'input */
             margin-right: 10px;
@@ -198,7 +306,7 @@
         /* ---------------------------------------------------- */
         #user-sidebar {
             grid-column: 2 / 3;
-            grid-row: 2 / 3;
+            grid-row: 3 / 4; /* Occupe la troisième ligne */
             background-color: #eceff1; /* Gris très clair */
             border-left: 1px solid #ccc;
             padding: 20px 15px;
@@ -234,6 +342,9 @@
             width: 30px;
             height: 30px;
             border-radius: 50%;
+            background-image: url('images/default_avatar.png'); /* Image par défaut */
+            background-size: cover; 
+            background-position: center;
             background-color: #3f51b5;
             display: flex;
             justify-content: center;
@@ -259,8 +370,11 @@
         #current-user-profile .avatar {
             width: 50px;
             height: 50px;
-            background-color: #00bcd4; /* Bleu ciel pour le profil */
+            /* background-color: #00bcd4; Bleu ciel pour le profil */
             font-size: 1.2em;
+            background-image: url('images/default_avatar_v1.png'); /* Image par défaut */
+            background-size: cover; 
+            background-position: center;
         }
 
         #current-user-profile span {
@@ -327,6 +441,30 @@
         #cancel-quit:hover {
             background-color: #bbb;
         }
+
+        /* Styles pour la modale de succès */
+        #success-modal .modal-content {
+            background-color: #e8f5e9; /* Vert très clair */
+            border: 1px solid #a5d6a7; /* Bordure verte */
+        }
+
+        #success-modal-ok-button {
+            background-color: #4caf50; /* Vert */
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: bold;
+            transition: background-color 0.2s;
+            margin-top: 15px;
+        }
+
+        #success-modal-ok-button:hover {
+            background-color: #388e3c; /* Vert plus foncé au survol */
+        }
+      
     </style>
 </head>
 <body>
@@ -348,15 +486,21 @@
             </div>
         </header>
 
+        <!-- Barre de Navigation Secondaire -->
+        <nav id="secondary-nav">
+            <button id="sidebar-toggle-button"><i class="fa-solid fa-bars"></i></button> <!-- Icône pour ouvrir/fermer la sidebar -->
+            <button id="open-profile-modal-button" style="background: none; border: none; color: white; font-size: 1.1rem; cursor: pointer; margin-left: 20px;"><i class="fa-solid fa-user-edit"></i> Mon Profil</button>
+        </nav>
+
         <!-- Colonne Latérale (Sidebar) - Liste des Utilisateurs -->
         <aside id="user-sidebar">
             <div id="current-user-profile">
                 <!-- L'ID sera injecté ici par JS -->
-                <div class="avatar" id="my-avatar">M</div> 
+                <div class="avatar" id="my-avatar"> </div> 
                 <span id="my-user-id">Chargement...</span>
             </div>
 
-            <h3>Utilisateurs Connectés</h3>
+            <h3>Utilisateurs Connectés (<span id="connected-users-count">0</span>)</h3>
             <!-- Conteneur pour la liste des autres utilisateurs -->
             <ul class="user-list" id="users-list">
                 <li style="color: #666; font-style: italic;">Aucun autre utilisateur en ligne.</li>
@@ -387,7 +531,20 @@
     </div>
     <!-- FIN MODAL -->
 
-    <script src="/socket.io/socket.io.js"></script> 
+    <!-- Modale de mise à jour du profil -->
+    <div id="profile-update-modal-container"></div>
+    <!-- FIN Modale de mise à jour du profil -->
+
+    <!-- Modale de succès générique -->
+    <div id="success-modal" class="modal">
+        <div class="modal-content">
+            <p id="success-modal-message"></p>
+            <button id="success-modal-ok-button">OK</button>
+        </div>
+    </div>
+    <!-- FIN Modale de succès générique -->
+
+    <script src="/socket.io/socket.io.js"></script>
     
     <script>
         // Encapsulation du code dans l'événement DOMContentLoaded pour garantir que la librairie Socket.IO est chargée
@@ -399,23 +556,70 @@
             const messages = document.getElementById('messages');
             const usersList = document.getElementById('users-list');
             const quitButton = document.getElementById('quit-button');
+            const sidebarToggleButton = document.getElementById('sidebar-toggle-button'); // Nouveau bouton
+            const userSidebar = document.getElementById('user-sidebar'); // La sidebar elle-même
             const myUserIdSpan = document.getElementById('my-user-id');
             const myAvatarDiv = document.getElementById('my-avatar');
             const unreadMessagesBadge = document.getElementById('unread-messages-badge');
+            const connectedUsersCountSpan = document.getElementById('connected-users-count'); // Nouvel élément pour le compteur
             
             // Récupération des éléments du modal
             const confirmationModal = document.getElementById('confirmation-modal');
             const confirmQuitButton = document.getElementById('confirm-quit');
             const cancelQuitButton = document.getElementById('cancel-quit');
-            
-            let currentUserId = null; // Variable pour stocker l'ID local
-            let unreadMessagesCount = 0; // Compteur de messages non lus
 
-            // Gérer la réception de l'ID utilisateur actuel du serveur
-            socket.on('current user', function(username) {
-                currentUserId = username;
-                myUserIdSpan.textContent = currentUserId + " (Moi)";
-                myAvatarDiv.textContent = currentUserId.charAt(0).toUpperCase();
+            // Récupération des éléments de la modale de profil
+            const profileUpdateModalContainer = document.getElementById('profile-update-modal-container');
+            const openProfileModalButton = document.getElementById('open-profile-modal-button');
+            let profileUpdateModal; // Sera défini après le chargement du contenu
+            let closeProfileModalButton;
+            let profileUpdateForm;
+                    let firstNameInput, lastNameInput, usernameInput, emailInput, profilePictureInput, currentProfilePictureImg, csrfTokenInput, profileErrorMessage, cancelProfileUpdateButton;
+            
+                    let currentUserId = null; // Variable pour stocker l'ID local
+                    let unreadMessagesCount = 0; // Compteur de messages non lus
+
+            // Récupération des éléments de la modale de succès
+            const successModal = document.getElementById('success-modal');
+            const successModalMessage = document.getElementById('success-modal-message');
+            const successModalOkButton = document.getElementById('success-modal-ok-button');
+
+            // Fonction pour afficher le modal (pour les alertes simples ou succès)
+            function showAlertModal(message, onOk = null, isError = false) {
+                const modal = isError ? confirmationModal : successModal;
+                const messageElement = isError ? modal.querySelector('p') : successModalMessage;
+                const okButton = isError ? document.getElementById('confirm-quit') : successModalOkButton;
+                const cancelButton = document.getElementById('cancel-quit');
+
+                messageElement.textContent = message;
+                modal.style.display = 'flex';
+
+                if (isError) {
+                    cancelButton.style.display = 'none'; // Cache le bouton Annuler pour les erreurs
+                    okButton.textContent = 'OK';
+                    okButton.onclick = () => {
+                        modal.style.display = 'none';
+                        if (onOk) onOk();
+                    };
+                } else {
+                    // Pour la modale de succès, on cache le bouton de confirmation du modal d'erreur
+                    confirmationModal.style.display = 'none'; 
+                    okButton.onclick = () => {
+                        modal.style.display = 'none';
+                        if (onOk) onOk();
+                    };
+                }
+            }
+
+            // Gérer la réception de l'ID utilisateur actuel du serveur et des informations de profil
+            socket.on('current user', function(userProfile) {
+                currentUserId = userProfile.username;
+                myUserIdSpan.textContent = " - " + currentUserId + " (Moi)";
+                if (userProfile.profilePicture) {
+                    myAvatarDiv.style.backgroundImage = `url('${userProfile.profilePicture}')`;
+                } else {
+                    myAvatarDiv.style.backgroundImage = `url('images/default_avatar_v1.png')`; // Fallback
+                }
             });
 
             // Fonction utilitaire pour mettre à jour le badge de messages non lus
@@ -451,13 +655,14 @@
             }
             
             // Fonction utilitaire pour mettre à jour la liste des utilisateurs
-            function updateUsersList(users) {
-                // L'ID utilisateur est maintenant défini par le serveur via l'événement 'current user'
-                // Cette section n'a plus besoin de générer un ID local
+            function updateUsersList(userProfiles) {
                 usersList.innerHTML = ''; // Vide la liste
                 
                 // Filtre l'utilisateur actuel et n'affiche que les autres
-                const otherUsers = users.filter(user => user !== currentUserId);
+                const otherUsers = userProfiles.filter(user => user.username !== currentUserId);
+
+                // Mettre à jour le compteur d'utilisateurs connectés
+                connectedUsersCountSpan.textContent = userProfiles.length;
 
                 if (otherUsers.length === 0) {
                     const item = document.createElement('li');
@@ -472,12 +677,140 @@
                     const item = document.createElement('li');
                     item.className = 'user-item';
                     item.innerHTML = `
-                        <div class="avatar">${user.charAt(0)}</div>
-                        <span>${user}</span>
+                        <div class="avatar" style="background-image: url('${user.profilePicture || 'images/default_avatar.png'}');"></div>
+                        <span>${user.username}</span>
                     `;
                     usersList.appendChild(item);
                 });
             }
+
+            // ----------------------------------------------------
+            // LOGIQUE DE LA MODALE DE PROFIL
+            // ----------------------------------------------------
+
+            // Charger le contenu de la modale de profil
+            fetch('/profile-modal.html')
+                .then(response => response.text())
+                .then(html => {
+                    profileUpdateModalContainer.innerHTML = html;
+                    profileUpdateModal = document.getElementById('profile-update-modal');
+                    closeProfileModalButton = profileUpdateModal.querySelector('.close-button');
+                    profileUpdateForm = document.getElementById('profile-update-form');
+                    firstNameInput = document.getElementById('first-name');
+                    lastNameInput = document.getElementById('last-name');
+                    usernameInput = document.getElementById('username');
+                    emailInput = document.getElementById('email');
+                    profilePictureInput = document.getElementById('profile-picture');
+                    currentProfilePictureImg = document.getElementById('current-profile-picture');
+                    csrfTokenInput = document.getElementById('csrf-token'); // Récupérer le champ CSRF
+                    profileErrorMessage = document.getElementById('profile-error-message'); // Récupérer l'élément d'erreur
+                    cancelProfileUpdateButton = document.getElementById('cancel-profile-update'); // Récupérer le bouton Annuler
+
+                    // Fonction pour charger le jeton CSRF et les données du profil
+                    const loadProfileDataAndCsrf = async () => {
+                        try {
+                            // Récupérer le jeton CSRF
+                            const csrfRes = await fetch('/api/csrf-token');
+                            const csrfData = await csrfRes.json();
+                            if (csrfData.csrfToken) {
+                                csrfTokenInput.value = csrfData.csrfToken;
+                            } else {
+                                showAlertModal('Erreur: Jeton CSRF non reçu.');
+                                return;
+                            }
+
+                            // Charger les données du profil existant
+                            const profileRes = await fetch('/api/profile');
+                            const profileData = await profileRes.json();
+
+                            if (profileData.success) {
+                                firstNameInput.value = profileData.profile.firstName || '';
+                                lastNameInput.value = profileData.profile.lastName || '';
+                                usernameInput.value = profileData.profile.username || '';
+                                emailInput.value = profileData.profile.email || '';
+                                if (profileData.profile.profilePicture) {
+                                    currentProfilePictureImg.src = profileData.profile.profilePicture;
+                                    currentProfilePictureImg.style.display = 'block';
+                                } else {
+                                    currentProfilePictureImg.style.display = 'none';
+                                }
+                            } else {
+                                showAlertModal('Erreur lors du chargement du profil: ' + profileData.message);
+                            }
+                        } catch (error) {
+                            console.error('Erreur:', error);
+                            profileErrorMessage.textContent = 'Erreur réseau lors du chargement du profil ou du jeton CSRF.';
+                            profileErrorMessage.style.display = 'block';
+                        }
+                    };
+
+                    // Ouvrir la modale
+                    openProfileModalButton.addEventListener('click', () => {
+                        profileUpdateModal.style.display = 'flex';
+                        profileErrorMessage.textContent = ''; // Effacer les messages d'erreur précédents
+                        profileErrorMessage.style.display = 'none';
+                        loadProfileDataAndCsrf(); // Charger les données et le jeton CSRF
+                    });
+
+                    // Fermer la modale via le bouton "X"
+                    closeProfileModalButton.addEventListener('click', () => {
+                        profileUpdateModal.style.display = 'none';
+                    });
+
+                    // Fermer la modale via le bouton "Annuler"
+                    cancelProfileUpdateButton.addEventListener('click', () => {
+                        profileUpdateModal.style.display = 'none';
+                    });
+
+                    // Fermer la modale si l'utilisateur clique en dehors
+                    window.addEventListener('click', (event) => {
+                        if (event.target === profileUpdateModal) {
+                            profileUpdateModal.style.display = 'none';
+                        }
+                    });
+
+                    // Gérer la soumission du formulaire de mise à jour du profil
+                    profileUpdateForm.addEventListener('submit', async (e) => {
+                        e.preventDefault();
+                        const formData = new FormData(profileUpdateForm);
+
+                        try {
+                            const response = await fetch('/api/profile', {
+                                method: 'PUT',
+                                body: formData
+                            });
+                            const result = await response.json();
+                            console.log('Résultat de la mise à jour du profil:', result); // Ajout d'un log
+
+                            if (result.success) {
+                                showAlertModal('Profil mis à jour avec succès !', () => {
+                                    profileUpdateModal.style.display = 'none';
+                                    window.location.href = '/'; // Rediriger vers la session de chat
+                                });
+                                // Mettre à jour l'avatar et le nom d'utilisateur dans la sidebar si nécessaire
+                                if (result.profile.username) {
+                                    myUserIdSpan.textContent = " - " + result.profile.username + " (Moi)";
+                                }
+                                if (result.profile.profilePicture) {
+                                    myAvatarDiv.style.backgroundImage = `url('${result.profile.profilePicture}')`;
+                                }
+                            } else {
+                                profileErrorMessage.textContent = result.message;
+                                profileErrorMessage.style.display = 'block';
+                            }
+                        } catch (error) {
+                            console.error('Erreur:', error);
+                            profileErrorMessage.textContent = 'Erreur réseau lors de la mise à jour du profil.';
+                            profileErrorMessage.style.display = 'block';
+                        }
+                    });
+                })
+                .catch(error => {
+                    console.error('Erreur lors du chargement de la modale de profil:', error);
+                    profileErrorMessage.textContent = 'Erreur lors du chargement de la modale de profil.';
+                    profileErrorMessage.style.display = 'block';
+                });
+
 
             // ----------------------------------------------------
             // LOGIQUE ÉVÉNEMENTIELLE
@@ -524,6 +857,26 @@
                 confirmationModal.style.display = 'flex';
             });
 
+            // 6. Gérer le bouton de bascule de la sidebar
+            sidebarToggleButton.addEventListener('click', function() {
+                userSidebar.classList.toggle('active');
+            });
+
+            // Fermer la sidebar si on clique en dehors (uniquement en mode overlay)
+            document.addEventListener('click', function(event) {
+                // Vérifie si la sidebar est active et si le clic n'est pas sur la sidebar ou le bouton toggle
+                if (userSidebar.classList.contains('active') && 
+                    !userSidebar.contains(event.target) && 
+                    !sidebarToggleButton.contains(event.target)) {
+                    
+                    // Vérifie si la media query est active (i.e., si on est en mode mobile/tablette)
+                    const isMobile = window.matchMedia('(max-width: 768px)').matches;
+                    if (isMobile) {
+                        userSidebar.classList.remove('active');
+                    }
+                }
+            });
+
             cancelQuitButton.addEventListener('click', function() {
                 // Cacher le modal si l'utilisateur annule
                 confirmationModal.style.display = 'none';
@@ -554,6 +907,26 @@
                 console.error('Erreur de connexion Socket.IO:', err.message);
                 if (err.message === 'Non autorisé') {
                     window.location.href = '/login.html'; // Rediriger vers la page de connexion
+                }
+            });
+
+            // Gérer l'événement de déconnexion forcée
+            socket.on('force_disconnect', (message) => {
+                showAlertModal(message, () => {
+                    window.location.href = '/logout'; // Rediriger vers la page de déconnexion
+                });
+            });
+
+            // Gérer l'événement de mise à jour du profil
+            socket.on('profile_updated', (data) => {
+                if (data.userId === currentUserId) {
+                    // Mettre à jour l'avatar et le nom d'utilisateur dans la sidebar
+                    if (data.profile.username) {
+                        myUserIdSpan.textContent = " - " + data.profile.username + " (Moi)";
+                    }
+                    if (data.profile.profilePicture) {
+                        myAvatarDiv.style.backgroundImage = `url('${data.profile.profilePicture}')`;
+                    }
                 }
             });
         }); // Fin de DOMContentLoaded

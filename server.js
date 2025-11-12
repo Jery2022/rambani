@@ -8,6 +8,8 @@ const session = require('express-session');
 const MongoStore = require('connect-mongo'); // Importe connect-mongo
 const csrf = require('csurf'); // Importe csurf
 const cookieParser = require('cookie-parser'); // Importe cookie-parser
+const multer = require('multer'); // Pour la gestion de l'upload de fichiers
+const fs = require('fs'); // Pour la gestion des fichiers (suppression d'anciennes photos)
 
 // --- Configuration du Serveur et de la Base de Données ---
 
@@ -59,18 +61,29 @@ app.use(sessionMiddleware);
 
 // Configuration CSRF
 const csrfProtection = csrf({ cookie: true });
-app.use(csrfProtection); // Appliquer globalement après la session et cookie-parser
+// app.use(csrfProtection); // Appliquer globalement après la session et cookie-parser (désactivé pour gérer les routes individuellement)
+
+// Configuration de Multer pour l'upload de photos de profil
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, 'public/images/profile_pictures/'); // Dossier où les images seront stockées
+    },
+    filename: (req, file, cb) => {
+        // Nom de fichier unique pour éviter les conflits
+        cb(null, Date.now() + '-' + file.originalname);
+    }
+});
+const upload = multer({ storage: storage });
 
 let db; // Variable pour stocker l'objet de la base de données MongoDB
 let mongoClientInstance; // Variable pour stocker l'instance du client MongoDB
 
 // Utiliser un Set pour garantir l'unicité des IDs d'utilisateur connectés
 const connectedUsers = new Set();
+// Objet pour stocker les sockets actifs par userId, permettant de gérer les connexions uniques
+const userSockets = {}; 
 
-// Middleware pour servir les fichiers statiques depuis le dossier 'public'
-app.use(express.static(path.join(__dirname, 'public')));
-
-// Middleware pour vérifier l'authentification
+// Middleware pour vérifier l'authentification pour les routes protégées (admin)
 function isAuthenticated(req, res, next) {
     if (req.session.user) {
         next();
@@ -84,18 +97,30 @@ function isAuthenticated(req, res, next) {
     }
 }
 
-// Route pour la page de connexion
+// Middleware pour vérifier l'authentification pour accéder au chat
+function isAuthenticatedChat(req, res, next) {
+    if (req.session.user) {
+        next();
+    } else {
+        // Si la requête est pour une route publique, rediriger vers la page de connexion publique
+        if (req.path.startsWith('/')) {
+            res.redirect('/login.html');
+        }  
+    }
+}
+
+// Route pour la page de connexion publique
 app.get('/login.html', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'login.html'));
 });
 
-// Route pour la page d'accueil (chat), protégée par l'authentification
-app.get('/', isAuthenticated, (req, res) => {
+// Route pour la page d'accueil (chat), protégée par l'authentification publique
+app.get('/', isAuthenticatedChat, (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // Route pour la page de connexion de l'administration
-app.get('/admin/login', (req, res) => {
+app.get('/admin/login', csrfProtection, (req, res) => {
     res.sendFile(path.join(__dirname, 'src', 'admin', 'login.html'), {
         csrfToken: req.csrfToken()
     });
@@ -113,28 +138,35 @@ app.get('/logout', (req, res) => {
 });
 
 // Route pour obtenir le jeton CSRF
-app.get('/api/csrf-token', (req, res) => {
+app.get('/api/csrf-token', csrfProtection, (req, res) => {
     res.json({ csrfToken: req.csrfToken() });
 });
 
 // Route d'enregistrement (pour les tests ou si l'utilisateur souhaite une fonctionnalité d'enregistrement)
-app.post('/register', async (req, res) => {
-    const { username, password } = req.body;
+app.post('/register', isAuthenticated, async (req, res) => {
+    const { username, password, email } = req.body; // Ajout de l'email
 
-    if (!username || !password) {
-        return res.status(400).json({ message: 'Pseudo et mot de passe sont requis.' });
+    if (!username || !password || !email) {
+        return res.status(400).json({ message: 'Pseudo, mot de passe et email sont requis.' });
     }
 
     try {
         const usersCollection = db.collection(USERS_COLLECTION_NAME);
-        const existingUser = await usersCollection.findOne({ username });
-
-        if (existingUser) {
+        
+        // Vérifier l'unicité du pseudo
+        const existingUserByUsername = await usersCollection.findOne({ username });
+        if (existingUserByUsername) {
             return res.status(409).json({ message: 'Ce pseudo est déjà pris.' });
         }
 
+        // Vérifier l'unicité de l'email
+        const existingUserByEmail = await usersCollection.findOne({ email });
+        if (existingUserByEmail) {
+            return res.status(409).json({ message: 'Cet email est déjà utilisé.' });
+        }
+
         const hashedPassword = await bcrypt.hash(password, 10); // Hacher le mot de passe
-        await usersCollection.insertOne({ username, password: hashedPassword, role: 'user' }); // Rôle par défaut 'user'
+        await usersCollection.insertOne({ username, password: hashedPassword, email, role: 'user' }); // Rôle par défaut 'user'
 
         res.status(201).json({ message: 'Utilisateur enregistré avec succès.' });
     } catch (error) {
@@ -166,10 +198,121 @@ app.post('/login', async (req, res) => {
         }
 
         req.session.user = { id: user._id.toString(), username: user.username, role: user.role }; // Stocker l'utilisateur et son rôle dans la session
+        req.session.user = { 
+            id: user._id.toString(), 
+            username: user.username, 
+            role: user.role,
+            firstName: user.firstName || '',
+            lastName: user.lastName || '',
+            email: user.email || '',
+            profilePicture: user.profilePicture || ''
+        }; // Stocker l'utilisateur et son rôle dans la session
         res.status(200).json({ message: 'Connexion réussie.', username: user.username, role: user.role });
     } catch (error) {
         console.error('Erreur lors de la connexion:', error);
         res.status(500).json({ message: 'Erreur serveur lors de la connexion.' });
+    }
+});
+
+// API pour récupérer le profil de l'utilisateur courant
+app.get('/api/profile', isAuthenticatedChat, async (req, res) => {
+    try {
+        const usersCollection = db.collection(USERS_COLLECTION_NAME);
+        const user = await usersCollection.findOne(
+            { _id: new ObjectId(req.session.user.id) },
+            { projection: { password: 0, role: 0 } } // Exclure le mot de passe et le rôle
+        );
+
+        if (!user) {
+            return res.status(404).json({ success: false, message: 'Profil utilisateur non trouvé.' });
+        }
+
+        res.status(200).json({ success: true, profile: user });
+    } catch (error) {
+        console.error('Erreur lors de la récupération du profil:', error);
+        res.status(500).json({ success: false, message: 'Erreur serveur lors de la récupération du profil.' });
+    }
+});
+
+// API pour mettre à jour le profil de l'utilisateur courant
+// Désactiver csrfProtection pour cette route car multer gère le body et csurf peut interférer
+app.put('/api/profile', isAuthenticatedChat, upload.single('profilePicture'), (req, res, next) => {
+    // Passer la requête au gestionnaire de route après le traitement de multer
+    next();
+}, async (req, res) => {
+    const userId = req.session.user.id;
+    const { firstName, lastName, username, email } = req.body;
+    let profilePicturePath = req.file ? `/images/profile_pictures/${req.file.filename}` : null;
+
+    // Validation des entrées
+    if (!firstName || !lastName || !username || !email) {
+        // Supprimer le fichier uploadé si la validation échoue
+        if (req.file) fs.unlinkSync(req.file.path);
+        return res.status(400).json({ success: false, message: 'Tous les champs sont requis.' });
+    }
+
+    try {
+        const usersCollection = db.collection(USERS_COLLECTION_NAME);
+        // Vérifier si le nom d'utilisateur est déjà pris par un autre utilisateur
+        const existingUserByUsername = await usersCollection.findOne({ username, _id: { $ne: new ObjectId(userId) } });
+        if (existingUserByUsername) {
+            if (req.file) fs.unlinkSync(req.file.path);
+            return res.status(409).json({ success: false, message: 'Ce nom d\'utilisateur est déjà pris.' });
+        }
+
+        // Vérifier si l'email est déjà pris par un autre utilisateur
+        const existingUserByEmail = await usersCollection.findOne({ email, _id: { $ne: new ObjectId(userId) } });
+        if (existingUserByEmail) {
+            if (req.file) fs.unlinkSync(req.file.path);
+            return res.status(409).json({ success: false, message: 'Cet email est déjà utilisé par un autre utilisateur.' });
+        }
+
+        const updateData = {
+            firstName,
+            lastName,
+            username,
+            email,
+            lastUpdated: new Date()
+        };
+
+        // Si une nouvelle photo de profil est uploadée
+        if (profilePicturePath) {
+            const oldUser = await usersCollection.findOne({ _id: new ObjectId(userId) });
+            // Supprimer l'ancienne photo de profil si elle existe et n'est pas une image par défaut
+            if (oldUser && oldUser.profilePicture && !oldUser.profilePicture.startsWith('/images/default_avatar')) {
+                const oldImagePath = path.join(__dirname, 'public', oldUser.profilePicture);
+                if (fs.existsSync(oldImagePath)) {
+                    fs.unlinkSync(oldImagePath);
+                }
+            }
+            updateData.profilePicture = profilePicturePath;
+        }
+
+        const result = await usersCollection.updateOne(
+            { _id: new ObjectId(userId) },
+            { $set: updateData }
+        );
+
+        if (result.matchedCount === 0) {
+            if (req.file) fs.unlinkSync(req.file.path);
+            return res.status(404).json({ success: false, message: 'Utilisateur non trouvé.' });
+        }
+
+        // Mettre à jour la session de l'utilisateur
+        req.session.user = {
+            ...req.session.user,
+            ...updateData,
+            id: userId // Assurez-vous que l'ID reste le même
+        };
+
+        // Émettre un événement Socket.IO pour informer les clients de la mise à jour du profil
+        io.emit('profile_updated', { userId: userId, profile: req.session.user });
+
+        res.status(200).json({ success: true, message: 'Profil mis à jour avec succès.', profile: req.session.user });
+    } catch (error) {
+        console.error('Erreur lors de la mise à jour du profil:', error);
+        if (req.file) fs.unlinkSync(req.file.path); // Supprimer le fichier en cas d'erreur
+        res.status(500).json({ success: false, message: 'Erreur serveur lors de la mise à jour du profil.' });
     }
 });
 
@@ -237,7 +380,7 @@ app.get('/api/admin/users', isAdmin, async (req, res) => {
 
 // API pour enregistrer un nouvel utilisateur (accessible uniquement aux administrateurs)
 app.post('/api/admin/users', isAdmin, async (req, res) => {
-    const { username, password, role } = req.body;
+    const { username, password, email, role } = req.body; // Ajout de l'email
 
     // Validation des entrées
     if (!username || typeof username !== 'string' || username.trim().length === 0) {
@@ -246,20 +389,30 @@ app.post('/api/admin/users', isAdmin, async (req, res) => {
     if (!password || typeof password !== 'string' || password.length < 8) { // Exiger une longueur minimale pour le mot de passe
         return res.status(400).json({ message: 'Le mot de passe doit contenir au moins 8 caractères.' });
     }
+    if (!email || typeof email !== 'string' || email.trim().length === 0) {
+        return res.status(400).json({ message: 'Email invalide.' });
+    }
     if (!role || typeof role !== 'string' || !['user', 'admin'].includes(role)) {
         return res.status(400).json({ message: 'Rôle invalide.' });
     }
 
     try {
         const usersCollection = db.collection(USERS_COLLECTION_NAME);
-        const existingUser = await usersCollection.findOne({ username });
-
-        if (existingUser) {
+        
+        // Vérifier l'unicité du pseudo
+        const existingUserByUsername = await usersCollection.findOne({ username });
+        if (existingUserByUsername) {
             return res.status(409).json({ message: 'Ce pseudo est déjà pris.' });
         }
 
+        // Vérifier l'unicité de l'email
+        const existingUserByEmail = await usersCollection.findOne({ email });
+        if (existingUserByEmail) {
+            return res.status(409).json({ message: 'Cet email est déjà utilisé.' });
+        }
+
         const hashedPassword = await bcrypt.hash(password, 10);
-        await usersCollection.insertOne({ username, password: hashedPassword, role });
+        await usersCollection.insertOne({ username, password: hashedPassword, email, role });
 
         res.status(201).json({ message: 'Utilisateur enregistré avec succès.' });
     } catch (error) {
@@ -326,7 +479,7 @@ app.get('/api/admin/users/:id', isAuthenticated, isAdmin, async (req, res) => {
 // API pour modifier un utilisateur (accessible uniquement aux administrateurs)
 app.put('/api/admin/users/:id', isAuthenticated, isAdmin, async (req, res) => {
     const { id } = req.params;
-    const { username, password, role } = req.body;
+    const { username, password, email, role } = req.body; // Ajout de l'email
 
     // Valider si l'ID est un ObjectId MongoDB valide
     if (!ObjectId.isValid(id)) {
@@ -337,6 +490,9 @@ app.put('/api/admin/users/:id', isAuthenticated, isAdmin, async (req, res) => {
     if (!username || typeof username !== 'string' || username.trim().length === 0) {
         return res.status(400).json({ message: 'Pseudo invalide.' });
     }
+    if (!email || typeof email !== 'string' || email.trim().length === 0) {
+        return res.status(400).json({ message: 'Email invalide.' });
+    }
     if (!role || typeof role !== 'string' || !['user', 'admin'].includes(role)) {
         return res.status(400).json({ message: 'Rôle invalide.' });
     }
@@ -346,7 +502,26 @@ app.put('/api/admin/users/:id', isAuthenticated, isAdmin, async (req, res) => {
 
     try {
         const usersCollection = db.collection(USERS_COLLECTION_NAME);
-        const updateData = { username, role };
+        
+        // Vérifier si le nouveau pseudo est déjà pris par un autre utilisateur
+        const existingUserByUsername = await usersCollection.findOne({
+            username: username,
+            _id: { $ne: new ObjectId(id) } // Exclure l'utilisateur actuel
+        });
+        if (existingUserByUsername) {
+            return res.status(409).json({ message: 'Ce pseudo est déjà pris par un autre utilisateur.' });
+        }
+
+        // Vérifier si l'email est déjà pris par un autre utilisateur
+        const existingUserByEmail = await usersCollection.findOne({
+            email: email,
+            _id: { $ne: new ObjectId(id) } // Exclure l'utilisateur actuel
+        });
+        if (existingUserByEmail) {
+            return res.status(409).json({ message: 'Cet email est déjà utilisé par un autre utilisateur.' });
+        }
+
+        const updateData = { username, email, role }; // Ajout de l'email
 
         if (password) {
             updateData.password = await bcrypt.hash(password, 10);
@@ -385,6 +560,12 @@ async function connectDB() {
     }
 }
 
+// Créer le dossier pour les photos de profil s'il n'existe pas
+const profilePicturesDir = path.join(__dirname, 'public', 'images', 'profile_pictures');
+if (!fs.existsSync(profilePicturesDir)) {
+    fs.mkdirSync(profilePicturesDir, { recursive: true });
+}
+
 // Middleware pour servir les fichiers statiques du dossier 'src/admin'
 app.use('/admin', express.static(path.join(__dirname, 'src', 'admin')));
 
@@ -415,14 +596,39 @@ function startServer() {
     const user = socket.request.user; // Récupérer l'utilisateur authentifié
     const userId = user.username; // Utiliser le pseudo comme ID utilisateur
 
+    // Gérer la connexion unique: déconnecter l'ancien socket si l'utilisateur se connecte ailleurs
+    if (userSockets[userId] && userSockets[userId] !== socket.id) {
+        console.log(`Déconnexion forcée de l'ancien socket pour ${userId}: ${userSockets[userId]}`);
+        io.to(userSockets[userId]).emit('force_disconnect', 'Vous avez été connecté sur une autre machine.');
+        // Optionnel: forcer la déconnexion côté serveur de l'ancien socket
+        const oldSocket = io.sockets.sockets.get(userSockets[userId]);
+        if (oldSocket) {
+            oldSocket.disconnect(true);
+        }
+    }
+    userSockets[userId] = socket.id; // Enregistrer le nouveau socket de l'utilisateur
+
     connectedUsers.add(userId);
 
     console.log(`Utilisateur connecté: ${userId} (${socket.id})`);
 
-    // Fonction utilitaire pour diffuser la liste des utilisateurs
-    const broadcastUserList = () => {
-        // Convertir le Set en Array avant l'émission
-        io.emit('user list', Array.from(connectedUsers));
+    // Fonction utilitaire pour diffuser la liste des utilisateurs avec leurs photos de profil
+    const broadcastUserList = async () => {
+        try {
+            const usersCollection = db.collection(USERS_COLLECTION_NAME);
+            const connectedUserProfiles = await Promise.all(
+                Array.from(connectedUsers).map(async (username) => {
+                    const user = await usersCollection.findOne(
+                        { username: username },
+                        { projection: { username: 1, profilePicture: 1, _id: 0 } }
+                    );
+                    return user || { username: username, profilePicture: '/images/default_avatar.png' }; // Fallback
+                })
+            );
+            io.emit('user list', connectedUserProfiles);
+        } catch (error) {
+            console.error('Erreur lors de la diffusion de la liste des utilisateurs:', error);
+        }
     };
     
     // 1. Envoyer l'historique des messages au nouvel utilisateur
@@ -450,8 +656,11 @@ function startServer() {
     // Mettre à jour et diffuser la liste des utilisateurs à tous
     broadcastUserList();
 
-    // Envoyer l'ID de l'utilisateur actuel au client pour affichage
-    socket.emit('current user', userId);
+    // Envoyer l'objet utilisateur actuel au client pour affichage
+    socket.emit('current user', {
+        username: user.username,
+        profilePicture: user.profilePicture || '' // Envoyer la photo de profil si elle existe
+    });
 
     // 2. Écouter les nouveaux messages
     socket.on('chat message', async (msg) => {
@@ -481,6 +690,10 @@ function startServer() {
     // 4. Gérer la déconnexion
     socket.on('disconnect', () => {
         connectedUsers.delete(userId);
+        // Supprimer l'entrée de userSockets si le socket déconnecté est celui enregistré
+        if (userSockets[userId] === socket.id) {
+            delete userSockets[userId];
+        }
         console.log(`Utilisateur déconnecté: ${userId} (${socket.id})`);
         
         const systemLeaveMsg = {
@@ -502,6 +715,9 @@ httpServer.listen(PORT, () => {
 
 
 }
+
+// Middleware pour servir les fichiers statiques depuis le dossier 'public' (déplacé après les routes)
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Lancer le processus de connexion à la base de données au démarrage
 connectDB();
