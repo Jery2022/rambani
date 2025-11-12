@@ -24,6 +24,51 @@
             max-width: 400px;
             text-align: center;
         }
+
+        /* Ajustements réactifs */
+        @media (max-width: 768px) {
+            .login-container {
+                margin: 20px;
+                padding: 30px;
+            }
+            .login-container h2 {
+                font-size: 1.8rem;
+            }
+            .logo {
+                width: 120px;
+                height: 120px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            body {
+                align-items: flex-start; /* Aligner en haut pour les petits écrans */
+                padding-top: 20px;
+            }
+            .login-container {
+                margin: 10px;
+                padding: 20px;
+                border-radius: 5px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            }
+            .login-container h2 {
+                font-size: 1.5rem;
+                margin-top: 0;
+            }
+            .logo {
+                width: 100px;
+                height: 100px;
+            }
+            .login-container input[type="text"],
+            .login-container input[type="password"] {
+                padding: 10px;
+                font-size: 0.9rem;
+            }
+            .login-container button {
+                padding: 10px 20px;
+                font-size: 1rem;
+            }
+        }
         .login-container h2 {
             margin-bottom: 30px;
             color: #333;
