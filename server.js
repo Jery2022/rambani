@@ -266,6 +266,7 @@ app.post('/login',
 
             if (!user) {
                 await loginAttemptsCollection.insertOne({ username, ip, timestamp: now, success: false });
+                logger.warn('Tentative de connexion échouée (pseudo incorrect)', { username, ip, type: 'login_attempt' });
                 return res.status(401).json({ message: 'Pseudo ou mot de passe incorrect.' });
             }
 
@@ -273,6 +274,7 @@ app.post('/login',
 
             if (!isPasswordValid) {
                 await loginAttemptsCollection.insertOne({ username, ip, timestamp: now, success: false });
+                logger.warn('Tentative de connexion échouée (mot de passe incorrect)', { username, ip, type: 'login_attempt' });
                 return res.status(401).json({ message: 'Pseudo ou mot de passe incorrect.' });
             }
 
@@ -288,6 +290,7 @@ app.post('/login',
                 email: user.email || '',
                 profilePicture: user.profilePicture || ''
             };
+            logger.info('Connexion utilisateur réussie', { username: user.username, ip, type: 'user_login' });
             res.status(200).json({ message: 'Connexion réussie.', username: user.username, role: user.role });
         } catch (error) {
             logger.error('Erreur lors de la connexion:', error);
@@ -488,6 +491,7 @@ app.post('/admin/login',
 
             if (!user) {
                 await loginAttemptsCollection.insertOne({ username, ip, timestamp: now, success: false });
+                logger.warn('Tentative de connexion admin échouée (pseudo incorrect)', { username, ip, type: 'admin_login_attempt' });
                 return res.status(401).json({ message: 'Pseudo ou mot de passe incorrect.' });
             }
 
@@ -495,6 +499,7 @@ app.post('/admin/login',
 
             if (!isPasswordValid) {
                 await loginAttemptsCollection.insertOne({ username, ip, timestamp: now, success: false });
+                logger.warn('Tentative de connexion admin échouée (mot de passe incorrect)', { username, ip, type: 'admin_login_attempt' });
                 return res.status(401).json({ message: 'Pseudo ou mot de passe incorrect.' });
             }
 
@@ -502,11 +507,12 @@ app.post('/admin/login',
             await loginAttemptsCollection.deleteMany({ username: username });
 
             if (user.role !== 'admin') {
+                logger.warn('Tentative de connexion admin échouée (rôle non autorisé)', { username, ip, type: 'admin_login_attempt' });
                 return res.status(403).json({ message: 'Accès refusé. Seuls les administrateurs peuvent se connecter ici.' });
             }
 
             req.session.user = { id: user._id.toString(), username: user.username, role: user.role };
-            logger.info('Admin login successful', { username: user.username });
+            logger.info('Connexion administrateur réussie', { username: user.username, ip, type: 'admin_login' });
             res.status(200).json({ message: 'Connexion réussie.' });
         } catch (error) {
             logger.error('Erreur lors de la connexion admin:', error);
@@ -803,7 +809,7 @@ function startServer() {
 
     connectedUsers.add(userId);
 
-    logger.info(`Utilisateur connecté: ${userId} (${socket.id})`);
+    logger.info(`Utilisateur connecté: ${userId} (${socket.id})`, { userId, socketId: socket.id, type: 'socket_connect' });
 
     // Fonction utilitaire pour diffuser la liste des utilisateurs avec leurs photos de profil
     const broadcastUserList = async () => {
@@ -887,7 +893,7 @@ function startServer() {
         if (userSockets[userId] === socket.id) {
             delete userSockets[userId];
         }
-        logger.info(`Utilisateur déconnecté: ${userId} (${socket.id})`);
+        logger.info(`Utilisateur déconnecté: ${userId} (${socket.id})`, { userId, socketId: socket.id, type: 'socket_disconnect' });
         
         const systemLeaveMsg = {
             user: 'Système',

@@ -40,6 +40,13 @@ const logger = winston.createLogger({
       filename: 'logs/combined.log',
       maxsize: 5242880, // 5MB
       maxFiles: 5
+    }),
+    // Write security audit logs to audit.log
+    new winston.transports.File({
+      filename: 'logs/audit.log',
+      level: 'info', // Ou un niveau plus spécifique si nécessaire
+      maxsize: 5242880, // 5MB
+      maxFiles: 5
     })
   ]
 });
