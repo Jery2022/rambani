@@ -14,6 +14,8 @@ const environments = {
     log_level: process.env.LOG_LEVEL || 'debug',
     helmet_enabled: false,
     rate_limit_enabled: false,
+    login_attempts_limit: parseInt(process.env.LOGIN_ATTEMPTS_LIMIT || '5', 10),
+    login_lock_time: parseInt(process.env.LOGIN_LOCK_TIME || '15', 10), // en minutes
   },
   staging: {
     node_env: 'staging',
@@ -28,6 +30,8 @@ const environments = {
     log_level: process.env.LOG_LEVEL || 'info',
     helmet_enabled: true,
     rate_limit_enabled: true,
+    login_attempts_limit: parseInt(process.env.LOGIN_ATTEMPTS_LIMIT || '5', 10),
+    login_lock_time: parseInt(process.env.LOGIN_LOCK_TIME || '15', 10), // en minutes
   },
   production: {
     node_env: 'production',
@@ -42,6 +46,8 @@ const environments = {
     log_level: process.env.LOG_LEVEL || 'error',
     helmet_enabled: true,
     rate_limit_enabled: true,
+    login_attempts_limit: parseInt(process.env.LOGIN_ATTEMPTS_LIMIT || '5', 10),
+    login_lock_time: parseInt(process.env.LOGIN_LOCK_TIME || '15', 10), // en minutes
   },
 };
 

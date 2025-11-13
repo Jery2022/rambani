@@ -20,6 +20,7 @@ const MONGODB_URI = config.mongodb_uri;
 const DB_NAME = config.mongodb_uri.split('/').pop().split('?')[0];
 const COLLECTION_NAME = 'messages';
 const USERS_COLLECTION_NAME = 'users'; // Collection pour les utilisateurs
+const LOGIN_ATTEMPTS_COLLECTION_NAME = 'login_attempts'; // Nouvelle collection pour les tentatives de connexion
 
 const app = express();
 const httpServer = createServer(app);
@@ -233,17 +234,50 @@ app.post('/login',
 
         try {
             const usersCollection = db.collection(USERS_COLLECTION_NAME);
+            const loginAttemptsCollection = db.collection(LOGIN_ATTEMPTS_COLLECTION_NAME);
+
+            // Nettoyer les anciennes tentatives de connexion pour cet utilisateur/IP
+            const ip = req.ip; // Récupérer l'adresse IP du client
+            const now = new Date();
+            const lockTimeMinutes = config.login_lock_time;
+            const lockTimeThreshold = new Date(now.getTime() - lockTimeMinutes * 60 * 1000);
+
+            // Supprimer les tentatives de connexion expirées
+            await loginAttemptsCollection.deleteMany({
+                $or: [
+                    { username: username, timestamp: { $lt: lockTimeThreshold } },
+                    { ip: ip, timestamp: { $lt: lockTimeThreshold } }
+                ]
+            });
+
+            // Vérifier si le compte est verrouillé
+            const recentFailedAttempts = await loginAttemptsCollection.countDocuments({
+                username: username,
+                success: false,
+                timestamp: { $gt: lockTimeThreshold }
+            });
+
+            if (recentFailedAttempts >= config.login_attempts_limit) {
+                logger.warn(`Tentative de connexion bloquée pour l'utilisateur ${username} (compte verrouillé).`);
+                return res.status(429).json({ message: `Trop de tentatives de connexion. Veuillez réessayer dans ${lockTimeMinutes} minutes.` });
+            }
+
             const user = await usersCollection.findOne({ username });
 
             if (!user) {
+                await loginAttemptsCollection.insertOne({ username, ip, timestamp: now, success: false });
                 return res.status(401).json({ message: 'Pseudo ou mot de passe incorrect.' });
             }
 
             const isPasswordValid = await bcrypt.compare(password, user.password);
 
             if (!isPasswordValid) {
+                await loginAttemptsCollection.insertOne({ username, ip, timestamp: now, success: false });
                 return res.status(401).json({ message: 'Pseudo ou mot de passe incorrect.' });
             }
+
+            // Si la connexion est réussie, supprimer toutes les tentatives de connexion échouées pour cet utilisateur
+            await loginAttemptsCollection.deleteMany({ username: username });
 
             req.session.user = { 
                 id: user._id.toString(), 
@@ -422,17 +456,50 @@ app.post('/admin/login',
 
         try {
             const usersCollection = db.collection(USERS_COLLECTION_NAME);
+            const loginAttemptsCollection = db.collection(LOGIN_ATTEMPTS_COLLECTION_NAME);
+
+            // Nettoyer les anciennes tentatives de connexion pour cet utilisateur/IP
+            const ip = req.ip; // Récupérer l'adresse IP du client
+            const now = new Date();
+            const lockTimeMinutes = config.login_lock_time;
+            const lockTimeThreshold = new Date(now.getTime() - lockTimeMinutes * 60 * 1000);
+
+            // Supprimer les tentatives de connexion expirées
+            await loginAttemptsCollection.deleteMany({
+                $or: [
+                    { username: username, timestamp: { $lt: lockTimeThreshold } },
+                    { ip: ip, timestamp: { $lt: lockTimeThreshold } }
+                ]
+            });
+
+            // Vérifier si le compte est verrouillé
+            const recentFailedAttempts = await loginAttemptsCollection.countDocuments({
+                username: username,
+                success: false,
+                timestamp: { $gt: lockTimeThreshold }
+            });
+
+            if (recentFailedAttempts >= config.login_attempts_limit) {
+                logger.warn(`Tentative de connexion admin bloquée pour l'utilisateur ${username} (compte verrouillé).`);
+                return res.status(429).json({ message: `Trop de tentatives de connexion. Veuillez réessayer dans ${lockTimeMinutes} minutes.` });
+            }
+
             const user = await usersCollection.findOne({ username });
 
             if (!user) {
+                await loginAttemptsCollection.insertOne({ username, ip, timestamp: now, success: false });
                 return res.status(401).json({ message: 'Pseudo ou mot de passe incorrect.' });
             }
 
             const isPasswordValid = await bcrypt.compare(password, user.password);
 
             if (!isPasswordValid) {
+                await loginAttemptsCollection.insertOne({ username, ip, timestamp: now, success: false });
                 return res.status(401).json({ message: 'Pseudo ou mot de passe incorrect.' });
             }
+
+            // Si la connexion est réussie, supprimer toutes les tentatives de connexion échouées pour cet utilisateur
+            await loginAttemptsCollection.deleteMany({ username: username });
 
             if (user.role !== 'admin') {
                 return res.status(403).json({ message: 'Accès refusé. Seuls les administrateurs peuvent se connecter ici.' });

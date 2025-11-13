@@ -208,8 +208,10 @@
                             });
                             errorHtml += '</ul>';
                             errorMessage.innerHTML = errorHtml;
+                        } else if (data.message) {
+                            errorMessage.textContent = data.message;
                         } else {
-                            errorMessage.textContent = data.message || 'Erreur de connexion.';
+                            errorMessage.textContent = 'Erreur de connexion.';
                         }
                         errorMessage.style.display = 'block';
                     }
