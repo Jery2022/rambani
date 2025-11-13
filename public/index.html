@@ -802,7 +802,16 @@
                                     myAvatarDiv.style.backgroundImage = `url('${result.profile.profilePicture}')`;
                                 }
                             } else {
-                                profileErrorMessage.textContent = result.message;
+                                if (result.errors && Array.isArray(result.errors)) {
+                                    let errorHtml = '<ul>';
+                                    result.errors.forEach(err => {
+                                        errorHtml += `<li>${err.msg}</li>`;
+                                    });
+                                    errorHtml += '</ul>';
+                                    profileErrorMessage.innerHTML = errorHtml;
+                                } else {
+                                    profileErrorMessage.textContent = result.message || 'Erreur lors de la mise à jour du profil.';
+                                }
                                 profileErrorMessage.style.display = 'block';
                             }
                         } catch (error) {

@@ -285,8 +285,17 @@
             }
 
             // Fonction pour afficher les messages
-            function showMessage(element, msg, type) {
-                element.textContent = msg;
+            function showMessage(element, data, type) {
+                if (data.errors && Array.isArray(data.errors)) {
+                    let errorHtml = '<ul>';
+                    data.errors.forEach(err => {
+                        errorHtml += `<li>${err.msg}</li>`;
+                    });
+                    errorHtml += '</ul>';
+                    element.innerHTML = errorHtml;
+                } else {
+                    element.textContent = data.message || data; // data peut être un message simple ou un objet
+                }
                 element.className = `message ${type}`;
                 element.style.display = 'block';
                 setTimeout(() => {
@@ -345,15 +354,15 @@
                         const data = await response.json();
                         if (response.ok) {
                             showMessage(usersMessage, data.message, 'success');
-                            loadUsers(); // Recharger la liste après suppression
-                        } else {
-                            showMessage(usersMessage, data.message || 'Erreur lors de la suppression.', 'error');
-                        }
-                    } catch (error) {
-                        console.error('Erreur lors de la suppression:', error);
-                        showMessage(usersMessage, 'Une erreur est survenue lors de la suppression.', 'error');
+                        loadUsers(); // Recharger la liste après suppression
+                    } else {
+                        showMessage(usersMessage, data, 'error');
                     }
-                }); // Fermeture correcte du callback de showConfirmationModal
+                } catch (error) {
+                    console.error('Erreur lors de la suppression:', error);
+                    showMessage(usersMessage, 'Une erreur est survenue lors de la suppression.', 'error');
+                }
+            }); // Fermeture correcte du callback de showConfirmationModal
             }
 
             // Gérer l'enregistrement d'un nouvel utilisateur
@@ -380,7 +389,7 @@
                         regRoleSelect.value = 'user';
                         loadUsers(); // Recharger la liste après enregistrement
                     } else {
-                        showMessage(registerMessage, data.message || 'Erreur lors de l\'enregistrement.', 'error');
+                        showMessage(registerMessage, data, 'error');
                     }
                 } catch (error) {
                     console.error('Erreur lors de l\'enregistrement:', error);

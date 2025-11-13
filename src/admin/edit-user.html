@@ -131,6 +131,9 @@
             <label for="username">Nom d'utilisateur:</label>
             <input type="text" id="username" name="username" required>
 
+            <label for="email">Email:</label>
+            <input type="email" id="email" name="email" required>
+
             <label for="password">Nouveau mot de passe (laisser vide pour ne pas changer):</label>
             <input type="password" id="password" name="password">
 
@@ -140,6 +143,7 @@
                 <option value="admin">Administrateur</option>
             </select>
             <input type="hidden" name="_csrf" id="csrf-token-edit">
+            <div id="edit-user-error-message" class="error-message" style="display: none;"></div>
             <button type="submit">Mettre à jour</button>
             <button type="button" class="back-button" onclick="window.location.href='/admin'">Annuler</button>
         </form>
@@ -162,19 +166,20 @@
         document.addEventListener('DOMContentLoaded', async () => {
             const urlParams = new URLSearchParams(window.location.search);
             const userId = urlParams.get('id');
-            console.log('ID utilisateur récupéré de l\'URL:', userId); // Ajout d'un log
+            console.log('ID utilisateur récupéré de l\'URL:', userId);
 
             // Éléments du modal
             const confirmationModal = document.getElementById('confirmation-modal');
             const modalMessage = document.getElementById('modal-message');
             const confirmActionButton = document.getElementById('confirm-action');
             const cancelActionButton = document.getElementById('cancel-action');
+            const editUserErrorMessage = document.getElementById('edit-user-error-message'); // Nouvel élément pour les erreurs
 
             // Fonction pour afficher le modal (pour les alertes simples)
             function showAlertModal(message, onConfirm = null) {
-                modalMessage.textContent = message;
+                modalMessage.innerHTML = message; // Utiliser innerHTML pour permettre des listes
                 confirmationModal.style.display = 'flex';
-                cancelActionButton.style.display = 'none'; // Cache le bouton Annuler pour les alertes
+                cancelActionButton.style.display = 'none';
                 confirmActionButton.onclick = () => {
                     confirmationModal.style.display = 'none';
                     if (onConfirm) onConfirm();
@@ -183,9 +188,9 @@
 
             // Fonction pour afficher le modal (pour les confirmations)
             function showConfirmationModal(message, onConfirm, onCancel = null) {
-                modalMessage.textContent = message;
+                modalMessage.innerHTML = message;
                 confirmationModal.style.display = 'flex';
-                cancelActionButton.style.display = 'inline-block'; // Affiche le bouton Annuler pour les confirmations
+                cancelActionButton.style.display = 'inline-block';
                 confirmActionButton.onclick = () => {
                     confirmationModal.style.display = 'none';
                     onConfirm();
@@ -194,6 +199,22 @@
                     confirmationModal.style.display = 'none';
                     if (onCancel) onCancel();
                 };
+            }
+
+            // Fonction pour afficher les erreurs de validation
+            function displayValidationErrors(errors) {
+                let errorHtml = '<ul>';
+                errors.forEach(err => {
+                    errorHtml += `<li>${err.msg}</li>`;
+                });
+                errorHtml += '</ul>';
+                editUserErrorMessage.innerHTML = errorHtml;
+                editUserErrorMessage.style.display = 'block';
+            }
+
+            function clearValidationErrors() {
+                editUserErrorMessage.innerHTML = '';
+                editUserErrorMessage.style.display = 'none';
             }
 
 
@@ -213,17 +234,18 @@
 
                 document.getElementById('userId').value = user._id;
                 document.getElementById('username').value = user.username;
-            document.getElementById('role').value = user.role;
+                document.getElementById('email').value = user.email; // Ajout de l'email
+                document.getElementById('role').value = user.role;
 
-            // Récupérer le jeton CSRF
-            try {
-                const response = await fetch('/api/csrf-token');
-                const data = await response.json();
-                document.getElementById('csrf-token-edit').value = data.csrfToken;
-            } catch (error) {
-                console.error('Erreur lors de la récupération du jeton CSRF:', error);
-                showAlertModal('Erreur de sécurité: Impossible de charger le jeton CSRF.');
-            }
+                // Récupérer le jeton CSRF
+                try {
+                    const response = await fetch('/api/csrf-token');
+                    const data = await response.json();
+                    document.getElementById('csrf-token-edit').value = data.csrfToken;
+                } catch (error) {
+                    console.error('Erreur lors de la récupération du jeton CSRF:', error);
+                    showAlertModal('Erreur de sécurité: Impossible de charger le jeton CSRF.');
+                }
 
             } catch (error) {
                 console.error('Erreur lors du chargement des données utilisateur:', error);
@@ -234,6 +256,7 @@
 
             document.getElementById('editUserForm').addEventListener('submit', async (event) => {
                 event.preventDefault();
+                clearValidationErrors(); // Effacer les erreurs précédentes
 
                 const formData = new FormData(event.target);
                 const data = Object.fromEntries(formData.entries());
@@ -248,19 +271,23 @@
                         method: 'PUT',
                         headers: {
                             'Content-Type': 'application/json',
-                            'CSRF-Token': document.getElementById('csrf-token-edit').value // Inclure le jeton CSRF dans l'en-tête
+                            'CSRF-Token': document.getElementById('csrf-token-edit').value
                         },
                         body: JSON.stringify(data)
                     });
 
                     if (!response.ok) {
                         const errorData = await response.json();
-                        throw new Error(errorData.message || 'Erreur lors de la mise à jour de l\'utilisateur.');
+                        if (errorData.errors) { // Si des erreurs de validation sont présentes
+                            displayValidationErrors(errorData.errors);
+                        } else {
+                            throw new Error(errorData.message || 'Erreur lors de la mise à jour de l\'utilisateur.');
+                        }
+                    } else {
+                        showAlertModal('Utilisateur mis à jour avec succès!', () => {
+                            window.location.href = '/admin';
+                        });
                     }
-
-                    showAlertModal('Utilisateur mis à jour avec succès!', () => {
-                        window.location.href = '/admin';
-                    });
 
                 } catch (error) {
                     console.error('Erreur lors de la mise à jour:', error);

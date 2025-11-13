@@ -200,8 +200,17 @@
                         // Connexion réussie, rediriger vers la page de chat
                         window.location.href = '/';
                     } else {
-                        // Afficher le message d'erreur du serveur
-                        errorMessage.textContent = data.message || 'Erreur de connexion.';
+                        // Afficher les messages d'erreur de validation ou un message générique
+                        if (data.errors && Array.isArray(data.errors)) {
+                            let errorHtml = '<ul>';
+                            data.errors.forEach(err => {
+                                errorHtml += `<li>${err.msg}</li>`;
+                            });
+                            errorHtml += '</ul>';
+                            errorMessage.innerHTML = errorHtml;
+                        } else {
+                            errorMessage.textContent = data.message || 'Erreur de connexion.';
+                        }
                         errorMessage.style.display = 'block';
                     }
                 } catch (error) {
