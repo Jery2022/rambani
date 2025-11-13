@@ -16,6 +16,7 @@ const environments = {
     rate_limit_enabled: false,
     login_attempts_limit: parseInt(process.env.LOGIN_ATTEMPTS_LIMIT || '5', 10),
     login_lock_time: parseInt(process.env.LOGIN_LOCK_TIME || '15', 10), // en minutes
+    redis_uri: process.env.REDIS_URI || 'redis://localhost:6379', // Ajout de l'URI Redis
   },
   staging: {
     node_env: 'staging',
@@ -32,6 +33,7 @@ const environments = {
     rate_limit_enabled: true,
     login_attempts_limit: parseInt(process.env.LOGIN_ATTEMPTS_LIMIT || '5', 10),
     login_lock_time: parseInt(process.env.LOGIN_LOCK_TIME || '15', 10), // en minutes
+    redis_uri: process.env.REDIS_URI, // Ajout de l'URI Redis
   },
   production: {
     node_env: 'production',
@@ -48,6 +50,7 @@ const environments = {
     rate_limit_enabled: true,
     login_attempts_limit: parseInt(process.env.LOGIN_ATTEMPTS_LIMIT || '5', 10),
     login_lock_time: parseInt(process.env.LOGIN_LOCK_TIME || '15', 10), // en minutes
+    redis_uri: process.env.REDIS_URI, // Ajout de l'URI Redis
   },
 };
 
@@ -56,7 +59,7 @@ const config = environments[env] || environments.development;
 
 // Validation des variables requises en production
 if (env === 'production') {
-  const required = ['MONGODB_URI', 'SESSION_SECRET', 'JWT_SECRET'];
+  const required = ['MONGODB_URI', 'SESSION_SECRET', 'JWT_SECRET', 'REDIS_URI']; // Ajout de REDIS_URI
   required.forEach(variable => {
     if (!process.env[variable]) {
       throw new Error(`Variable d'environnement requise manquante: ${variable}`);

@@ -13,6 +13,10 @@ const cookieParser = require('cookie-parser'); // Importe cookie-parser
 const multer = require('multer'); // Pour la gestion de l'upload de fichiers
 const fs = require('fs'); // Pour la gestion des fichiers (suppression d'anciennes photos)
 const { body, validationResult } = require('express-validator'); // Importe express-validator
+const redis = require('redis'); // Importe le client Redis
+const { createAdapter } = require('@socket.io/redis-adapter'); // Importe l'adaptateur Redis pour Socket.IO
+const RedisStore = require('connect-redis').default; // Importe connect-redis
+
 // --- Configuration du Serveur et de la Base de Données ---
 
 const PORT = config.port;
@@ -21,9 +25,29 @@ const DB_NAME = config.mongodb_uri.split('/').pop().split('?')[0];
 const COLLECTION_NAME = 'messages';
 const USERS_COLLECTION_NAME = 'users'; // Collection pour les utilisateurs
 const LOGIN_ATTEMPTS_COLLECTION_NAME = 'login_attempts'; // Nouvelle collection pour les tentatives de connexion
+const REDIS_URI = config.redis_uri; // URI Redis depuis la configuration
 
 const app = express();
 const httpServer = createServer(app);
+
+// Configuration Redis pour l'adaptateur Socket.IO et le cache
+const redisClient = redis.createClient({ url: REDIS_URI });
+
+redisClient.on('error', (err) => logger.error('Erreur Redis:', err));
+redisClient.on('connect', () => logger.info('Connexion à Redis réussie !'));
+
+// Connecter le client Redis
+(async () => {
+    await redisClient.connect();
+    const pubClient = redisClient.duplicate();
+    const subClient = redisClient.duplicate();
+
+    await Promise.all([pubClient.connect(), subClient.connect()]);
+    io.adapter(createAdapter(pubClient, subClient));
+    logger.info('Adaptateur Socket.IO Redis configuré.');
+})();
+
+
 const io = new Server(httpServer, {
 // Configuration CORS avec liste de domaines autorisés
 cors: {
@@ -39,21 +63,19 @@ app.use(express.urlencoded({ extended: true }));
 // Utiliser cookie-parser avant la session et csurf
 app.use(cookieParser());
 
-// Configuration de la session
+// Configuration de la session avec Redis
+const sessionStore = new RedisStore({ client: redisClient, prefix: 'sess:' });
+
 const sessionMiddleware = session({
     secret: config.session_secret,
     resave: false,
     saveUninitialized: false,
-    store: MongoStore.create({
-        mongoUrl: MONGODB_URI,
-        dbName: DB_NAME,
-        collectionName: 'sessions',
-        ttl: 7 * 24 * 60 * 60 // = 7 jours. Par défaut
-    }),
+    store: sessionStore, // Utiliser Redis pour le stockage des sessions
     cookie: { 
         secure: config.node_env === 'production', // Utiliser secure: true en production (HTTPS)
         sameSite: 'Lax', // 'Strict' ou 'Lax' pour la protection CSRF
-        httpOnly: true // Empêche l'accès au cookie via JavaScript côté client
+        httpOnly: true, // Empêche l'accès au cookie via JavaScript côté client
+        maxAge: 7 * 24 * 60 * 60 * 1000 // 7 jours
     }
 });
 
@@ -97,6 +119,30 @@ let mongoClientInstance; // Variable pour stocker l'instance du client MongoDB
 const connectedUsers = new Set();
 // Objet pour stocker les sockets actifs par userId, permettant de gérer les connexions uniques
 const userSockets = {}; 
+
+// Fonction pour récupérer un profil utilisateur depuis le cache Redis ou la base de données
+async function getUserProfileFromCacheOrDB(username) {
+    const cacheKey = `user:${username}:profile`;
+    let userProfile = await redisClient.get(cacheKey);
+
+    if (userProfile) {
+        logger.debug(`Profil utilisateur ${username} récupéré du cache.`);
+        return JSON.parse(userProfile);
+    }
+
+    logger.debug(`Profil utilisateur ${username} non trouvé dans le cache, récupération depuis la DB.`);
+    const usersCollection = db.collection(USERS_COLLECTION_NAME);
+    const user = await usersCollection.findOne(
+        { username: username },
+        { projection: { username: 1, profilePicture: 1, _id: 0 } }
+    );
+
+    if (user) {
+        await redisClient.set(cacheKey, JSON.stringify(user), { EX: 3600 }); // Cache pendant 1 heure
+        return user;
+    }
+    return { username: username, profilePicture: '/images/default_avatar.png' }; // Fallback
+}
 
 // Middleware pour vérifier l'authentification pour les routes protégées (admin)
 function isAuthenticated(req, res, next) {
@@ -826,14 +872,9 @@ function startServer() {
     // Fonction utilitaire pour diffuser la liste des utilisateurs avec leurs photos de profil
     const broadcastUserList = async () => {
         try {
-            const usersCollection = db.collection(USERS_COLLECTION_NAME);
             const connectedUserProfiles = await Promise.all(
                 Array.from(connectedUsers).map(async (username) => {
-                    const user = await usersCollection.findOne(
-                        { username: username },
-                        { projection: { username: 1, profilePicture: 1, _id: 0 } }
-                    );
-                    return user || { username: username, profilePicture: '/images/default_avatar.png' }; // Fallback
+                    return await getUserProfileFromCacheOrDB(username);
                 })
             );
             io.emit('user list', connectedUserProfiles);
@@ -844,11 +885,20 @@ function startServer() {
     
     // 1. Envoyer l'historique des messages au nouvel utilisateur
     try {
-            const history = await db.collection(COLLECTION_NAME)
+            // Tenter de récupérer l'historique des messages depuis Redis
+            let history = await redisClient.get('chat:history');
+            if (history) {
+                history = JSON.parse(history);
+                logger.debug('Historique des messages récupéré du cache Redis.');
+            } else {
+                logger.debug('Historique des messages non trouvé dans le cache, récupération depuis la DB.');
+                history = await db.collection(COLLECTION_NAME)
                                     .find({})
                                     .sort({ timestamp: 1 }) // Trier par timestamp croissant
                                     .limit(100) 
                                     .toArray();
+                await redisClient.set('chat:history', JSON.stringify(history), { EX: 600 }); // Cache pendant 10 minutes
+            }
             socket.emit('history', history);
         
             // Annoncer la connexion à tout le monde
@@ -868,9 +918,10 @@ function startServer() {
     broadcastUserList();
 
     // Envoyer l'objet utilisateur actuel au client pour affichage
+    const currentUserProfile = await getUserProfileFromCacheOrDB(user.username);
     socket.emit('current user', {
-        username: user.username,
-        profilePicture: user.profilePicture || '' // Envoyer la photo de profil si elle existe
+        username: currentUserProfile.username,
+        profilePicture: currentUserProfile.profilePicture || '' // Envoyer la photo de profil si elle existe
     });
 
     // 2. Écouter les nouveaux messages
