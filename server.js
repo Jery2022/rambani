@@ -750,7 +750,19 @@ async function connectDB() {
             db = mongoClientInstance.db(DB_NAME);
             
             logger.info('Connexion à MongoDB réussie ! Base de données :', DB_NAME);
-            // Démarrer le serveur HTTP seulement après la connexion à la DB
+
+            // Création des index pour la collection 'users'
+            await db.collection(USERS_COLLECTION_NAME).createIndex({ username: 1 }, { unique: true });
+            await db.collection(USERS_COLLECTION_NAME).createIndex({ email: 1 }, { unique: true });
+            logger.info('Index créés pour la collection "users" (username, email).');
+
+            // Création des index pour la collection 'login_attempts'
+            await db.collection(LOGIN_ATTEMPTS_COLLECTION_NAME).createIndex({ username: 1 });
+            await db.collection(LOGIN_ATTEMPTS_COLLECTION_NAME).createIndex({ ip: 1 });
+            await db.collection(LOGIN_ATTEMPTS_COLLECTION_NAME).createIndex({ timestamp: 1 }, { expireAfterSeconds: config.login_lock_time * 60 }); // Index TTL
+            logger.info('Index créés pour la collection "login_attempts" (username, ip, timestamp).');
+
+            // Démarrer le serveur HTTP seulement après la connexion à la DB et la création des index
             startServer();
         } catch (error) {
             logger.error('Échec de la connexion à MongoDB:', error);
