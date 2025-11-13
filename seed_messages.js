@@ -20,21 +20,11 @@ const Message = mongoose.model(COLLECTION_NAME, MessageSchema);
 // --- 2. Jeu de Données Initial ---
 const initialMessages = [
     { 
-        user: 'Alpha', 
-        text: 'Bonjour à tous ! Je suis le premier utilisateur.', 
+        user: 'Admin', 
+        text: 'Bonjour à tous ! Bienvenue sur ce super chat.', 
         // Utilisation d'un timestamp précis pour garantir l'ordre
         timestamp: new Date(Date.now() - 30000) 
-    },
-    { 
-        user: 'Bravo', 
-        text: 'Salut Alpha ! Bienvenue sur ce super chat.',
-        timestamp: new Date(Date.now() - 20000) 
-    },
-    { 
-        user: 'Charlie', 
-        text: 'Ravi de vous voir tous les deux. Prêt pour le temps réel !',
-        timestamp: new Date(Date.now() - 10000) 
-    }
+    }    
 ];
 
 // --- 3. Fonction d'Amorçage (Seeding) ---

@@ -1,4 +1,5 @@
 const express = require('express');
+const config = require('./config/environment');
 const { createServer } = require('http');
 const { Server } = require('socket.io');
 const { MongoClient, ObjectId } = require('mongodb'); // Ajout de ObjectId
@@ -16,8 +17,8 @@ const fs = require('fs'); // Pour la gestion des fichiers (suppression d'ancienn
 const PORT = process.env.PORT || 3000;
 
 // URI de connexion à MongoDB  
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/chat_db';
-const DB_NAME = 'chat_db';
+// const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/chat_db';
+// const DB_NAME = 'chat_db';
 const COLLECTION_NAME = 'messages';
 const USERS_COLLECTION_NAME = 'users'; // Collection pour les utilisateurs
 

@@ -15,7 +15,8 @@ yarn-error.log*
 *.log
 *.sqlite
 *.sqlite3
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env
+.env.development
+.env.test
+.env.production
+seed_messages.*
