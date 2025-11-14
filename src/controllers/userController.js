@@ -1,11 +1,10 @@
+/*  */
 const path = require('path');
 const { ObjectId } = require('mongodb');
 const { validationResult } = require('express-validator');
 const fs = require('fs');
 const logger = require('../../config/logger');
 const UserModel = require('../models/UserModel');
-const { getUserProfileFromCacheOrDB } = require('../models/UserModel'); // Assurez-vous que cette fonction est exportée
-
 // API pour récupérer le profil de l'utilisateur courant
 exports.getUserProfile = async (req, res) => {
     try {
