@@ -13,20 +13,20 @@ const cookieParser = require('cookie-parser'); // Importe cookie-parser
 const multer = require('multer'); // Pour la gestion de l'upload de fichiers
 const fs = require('fs'); // Pour la gestion des fichiers (suppression d'anciennes photos)
 const { body, validationResult } = require('express-validator'); // Importe express-validator
-const redis = require('redis'); // Importe le client Redis
-const { createAdapter } = require('@socket.io/redis-adapter'); // Importe l'adaptateur Redis pour Socket.IO
-const RedisStore = require('connect-redis').default; // Importe connect-redis
+const redis = require('redis');
+const RedisStore = require('connect-redis').default;
+const { createAdapter } = require('@socket.io/redis-adapter');
 
 // --- Configuration du Serveur et de la Base de Données ---
-
 const PORT = config.port;
 const MONGODB_URI = config.mongodb_uri;
 const DB_NAME = config.mongodb_uri.split('/').pop().split('?')[0];
 const COLLECTION_NAME = 'messages';
-const USERS_COLLECTION_NAME = 'users'; // Collection pour les utilisateurs
-const LOGIN_ATTEMPTS_COLLECTION_NAME = 'login_attempts'; // Nouvelle collection pour les tentatives de connexion
-const REDIS_URI = config.redis_uri; // URI Redis depuis la configuration
+const USERS_COLLECTION_NAME = 'users';
+const LOGIN_ATTEMPTS_COLLECTION_NAME = 'login_attempts';
+const REDIS_URI = config.redis_uri;
 
+// --- Initialisation de l'application Express et du serveur HTTP ---
 const app = express();
 const httpServer = createServer(app);
 
@@ -36,9 +36,17 @@ const redisClient = redis.createClient({ url: REDIS_URI });
 redisClient.on('error', (err) => logger.error('Erreur Redis:', err));
 redisClient.on('connect', () => logger.info('Connexion à Redis réussie !'));
 
-// Connecter le client Redis
+const io = new Server(httpServer, {
+  cors: {
+    origin: config.allowed_origins,
+    methods: ["GET", "POST","PUT","DELETE"]
+  }
+});
+
+// Connecter le client Redis et configurer l'adaptateur Socket.IO
 (async () => {
     await redisClient.connect();
+    
     const pubClient = redisClient.duplicate();
     const subClient = redisClient.duplicate();
 
@@ -48,13 +56,6 @@ redisClient.on('connect', () => logger.info('Connexion à Redis réussie !'));
 })();
 
 
-const io = new Server(httpServer, {
-// Configuration CORS avec liste de domaines autorisés
-cors: {
-    origin: config.allowed_origins,
-    methods: ["GET", "POST","PUT","DELETE"]
-}
-});
 
 // Middleware pour parser le JSON dans les requêtes
 app.use(express.json());
@@ -63,19 +64,17 @@ app.use(express.urlencoded({ extended: true }));
 // Utiliser cookie-parser avant la session et csurf
 app.use(cookieParser());
 
-// Configuration de la session avec Redis
-const sessionStore = new RedisStore({ client: redisClient, prefix: 'sess:' });
-
+// Configuration de la session avec MongoStore (MongoDB)
 const sessionMiddleware = session({
-    secret: config.session_secret,
+    store: MongoStore.create({ mongoUrl: MONGODB_URI }),
+    secret: config.session_secret, 
     resave: false,
     saveUninitialized: false,
-    store: sessionStore, // Utiliser Redis pour le stockage des sessions
     cookie: { 
-        secure: config.node_env === 'production', // Utiliser secure: true en production (HTTPS)
-        sameSite: 'Lax', // 'Strict' ou 'Lax' pour la protection CSRF
-        httpOnly: true, // Empêche l'accès au cookie via JavaScript côté client
-        maxAge: 7 * 24 * 60 * 60 * 1000 // 7 jours
+        secure: config.node_env === 'production',
+        sameSite: 'Lax',
+        httpOnly: true,
+        maxAge: 7 * 24 * 60 * 60 * 1000
     }
 });
 
