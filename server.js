@@ -12,7 +12,8 @@ const { createAdapter } = require('@socket.io/redis-adapter');
 
 const redisClient = require('./config/redisClient');
 const authRoutes = require('./src/routes/authRoutes');
-const userRoutes = require('./src/routes/userRoutes');
+const apiRoutes = require('./src/routes/apiRoutes');
+const adminRoutes = require('./src/routes/adminRoutes');
 const { csrfErrorHandler } = require('./src/middleware/csrfMiddleware');
 const UserModel = require('./src/models/UserModel');
 const LoginAttemptModel = require('./src/models/LoginAttemptModel');
@@ -117,8 +118,9 @@ async function connectDB() {
 app.use('/admin', express.static(path.join(__dirname, 'src', 'admin')));
 
 // Utilisation des routes
-app.use('/', authRoutes);
-app.use('/', userRoutes);
+app.use('/auth', authRoutes); // Routes d'authentification
+app.use('/api', apiRoutes);   // Routes API
+app.use('/admin', adminRoutes); // Routes d'administration
 
 // Gestion des erreurs CSRF
 app.use(csrfErrorHandler);

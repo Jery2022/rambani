@@ -14,14 +14,8 @@ router.get('/login.html', authController.getLoginPage);
 // Route pour la page d'accueil (chat), protégée par l'authentification publique
 router.get('/', authMiddleware.isAuthenticatedChat, authController.getHomePage);
 
-// Route pour la page de connexion de l'administration
-router.get('/admin/login', csrfMiddleware.csrfProtection, authController.getAdminLoginPage);
-
 // Route de déconnexion
 router.get('/logout', authController.logout);
-
-// Route pour obtenir le jeton CSRF
-router.get('/api/csrf-token', csrfMiddleware.csrfProtection, authController.getCsrfToken);
 
 // Route d'enregistrement (pour les tests ou si l'utilisateur souhaite une fonctionnalité d'enregistrement)
 router.post('/register', 
@@ -58,21 +52,6 @@ router.post('/login',
             .escape() // Protection XSS
     ],
     authController.login
-);
-
-// Route de connexion pour l'administration
-router.post('/admin/login', 
-    csrfMiddleware.csrfProtection,
-    [
-        body('username')
-            .trim()
-            .notEmpty().withMessage('Le pseudo est requis.')
-            .escape(), // Protection XSS
-        body('password')
-            .notEmpty().withMessage('Le mot de passe est requis.')
-            .escape() // Protection XSS
-    ],
-    authController.adminLogin
 );
 
 module.exports = router;
