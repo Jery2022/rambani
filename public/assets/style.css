@@ -1,0 +1,468 @@
+/* CSS pour la mise en page complète */
+body { 
+    margin: 0; 
+    font-family: 'Inter', sans-serif;
+    background-color: #f7f7f7;
+    display: flex; /* Utilisation de flex pour toute la page */
+    height: 100vh;
+    overflow: hidden; /* Empêche le scroll du body */
+}
+
+/* Conteneur principal pour le chat et la barre latérale */
+#main-container {
+    display: grid;
+    grid-template-columns: 1fr 250px; /* Desktop/Tablet: Chat principal (1fr) + Sidebar (250px) */
+    grid-template-rows: 70px 50px 1fr; /* Barre du haut (70px) + Barre secondaire (50px) + Contenu principal */
+    height: 100%;
+    width: 100%;
+}
+
+/* ---------------------------------------------------- */
+/* BARRE DE NAVIGATION SECONDAIRE */
+/* ---------------------------------------------------- */
+#secondary-nav {
+    grid-column: 1 / 3; /* S'étend sur les deux colonnes */
+    grid-row: 2 / 3; /* Sous la barre principale */
+    background-color: #5c6bc0; /* Bleu légèrement plus clair */
+    color: white;
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    z-index: 9; /* Juste en dessous de la barre principale */
+}
+
+#secondary-nav #sidebar-toggle-button {
+    margin-right: 0; /* Réinitialise la marge du bouton */
+}
+
+/* ---------------------------------------------------- */
+/* BARRE DE NAVIGATION SECONDAIRE */
+/* ---------------------------------------------------- */
+#secondary-nav {
+    grid-column: 1 / 3; /* S'étend sur les deux colonnes */
+    grid-row: 2 / 3; /* Sous la barre principale */
+    background-color: #5c6bc0; /* Bleu légèrement plus clair */
+    color: white;
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    z-index: 9; /* Juste en dessous de la barre principale */
+}
+
+#secondary-nav #sidebar-toggle-button {
+    margin-right: 0; /* Réinitialise la marge du bouton */
+}
+
+/* ---------------------------------------------------- */
+/* BOUTON TOGGLE SIDEBAR (MOBILE) */
+/* ---------------------------------------------------- */
+#sidebar-toggle-button {
+    display: none; /* Caché par défaut */
+    background: none;
+    border: none;
+    color: white;
+    font-size: 1.5rem;
+    cursor: pointer;
+    margin-right: 15px;
+}
+
+/* ---------------------------------------------------- */
+/* MEDIA QUERIES POUR LA RÉACTIVITÉ */
+/* ---------------------------------------------------- */
+@media (max-width: 768px) { /* Pour les tablettes et mobiles */
+    #main-container {
+        grid-template-columns: 1fr; /* Une seule colonne pour le chat */
+    }
+
+    #chat-header {
+        grid-column: 1 / 2; /* S'étend sur la seule colonne */
+    }
+
+    #secondary-nav {
+        grid-column: 1 / 2; /* S'étend sur la seule colonne */
+    }
+
+    #chat-area {
+        grid-column: 1 / 2;
+        grid-row: 3 / 4; /* Occupe la troisième ligne */
+    }
+
+    #user-sidebar {
+        grid-column: 1 / 2; /* S'étend sur la seule colonne */
+        grid-row: 3 / 4; /* Occupe la même ligne que la zone de chat */
+        position: fixed; /* Position fixe pour l'overlay */
+        top: 120px; /* Sous la barre principale (70px) et la barre secondaire (50px) */
+        right: -350px; /* Caché par défaut à droite */
+        width: 250px;
+        height: calc(100% - 230px);  /* Hauteur totale - header (70px) - secondary nav (50px) - form message (70px) - autres (40px)*/
+        z-index: 999; /* Au-dessus du contenu principal */
+        box-shadow: -2px 0 5px rgba(0,0,0,0.2);
+        transition: right 0.3s ease-in-out; /* Animation de transition */
+    }
+
+    #user-sidebar.active {
+        right: 0; /* Affiche la sidebar */
+    }
+
+    #sidebar-toggle-button {
+        display: block; /* Affiche le bouton sur mobile/tablette */
+    }
+}
+
+@media (max-width: 480px) { /* Pour les petits mobiles */
+    #chat-header h1 {
+        font-size: 1.4rem;
+    }
+    #quit-button {
+        padding: 6px 10px;
+        font-size: 0.9rem;
+    }
+    #sidebar-toggle-button {
+        font-size: 1.3rem;
+        display: block; /* S'assure que le bouton est visible en mode mobile */
+    }
+}
+/* ---------------------------------------------------- */
+/* BARRE SUPÉRIEURE (HEADER) */
+/* ---------------------------------------------------- */
+#chat-header {
+    grid-column: 1 / 3; /* S'étend sur les deux colonnes */
+    grid-row: 1 / 2; /* Première ligne */
+    background-color: #3f51b5; /* Bleu primaire */
+    color: white;
+    padding: 0 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    z-index: 10;
+}
+
+#chat-header .header-title {
+    display: flex;
+    align-items: center;
+}
+
+#chat-header .header-title img {
+    height: 50px; /* Ajustez la taille du logo selon vos besoins */
+    margin-right: 15px;
+}
+
+#chat-header h1 {
+    font-size: 1.8rem;
+    margin: 0;
+    font-weight: 700;
+}
+
+#quit-button {
+    background-color: #f44336; /* Rouge */
+    color: white;
+    border: none;
+    padding: 8px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background-color 0.2s;
+}
+#quit-button:hover {
+    background-color: #d32f2f; /* Rouge plus foncé au survol */
+}
+
+/* Styles pour le badge de notification */
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 20px; /* Espace entre le bouton Quitter et l'icône de notification */
+}
+
+.notification-icon {
+    position: relative;
+    font-size: 1.5rem;
+    color: white;
+    cursor: pointer;
+}
+
+.notification-icon .badge {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background-color: #ffc107; /* Jaune pour le badge */
+    color: #333;
+    border-radius: 50%;
+    padding: 3px 7px;
+    font-size: 0.7rem;
+    font-weight: bold;
+    min-width: 20px;
+    text-align: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    display: none; /* Caché par défaut, affiché si > 0 */
+}
+
+/* ---------------------------------------------------- */
+/* ZONE PRINCIPALE DU CHAT */
+/* ---------------------------------------------------- */
+#chat-area {
+    grid-column: 1 / 2;
+    grid-row: 3 / 4; /* Occupe la troisième ligne */
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background-color: white;
+}
+
+#messages-wrapper {
+    flex-grow: 1; 
+    overflow-y: auto; /* Permet le défilement des messages */
+    padding: 10px 20px;
+    padding-bottom: 70px; /* Espace pour le formulaire fixe */
+    display: flex; /* Utilise flexbox pour le wrapper */
+    flex-direction: column; /* Empile les messages verticalement */
+}
+
+#form { 
+    background: #e0e0e0;
+    padding: 10px 20px;
+    display: flex; 
+    min-height: 70px; /* Hauteur minimale pour le formulaire */
+    align-items: center; /* Centre verticalement les éléments */
+    box-sizing: border-box; 
+    border-top: 1px solid #ccc;
+}
+#input { 
+    border: 1px solid #ccc;
+    padding: 0 1.2rem; 
+    flex-grow: 1; 
+    border-radius: 20px; /* Coins arrondis pour l'input */
+    margin-right: 10px;
+    min-height: 40px; /* Hauteur ajustée à 30px */
+}
+#input:focus { outline: 2px solid #3f51b5; border-color: transparent; }
+#form > button { 
+    background: #3f51b5; 
+    border: none; 
+    padding: 0 20px; 
+    border-radius: 20px; 
+    color: #fff; 
+    cursor: pointer;
+    font-weight: bold;
+    min-height: 40px; /* Hauteur ajustée à 30px */
+}
+#form > button:hover { background: #303f9f; }
+
+#messages { list-style-type: none; margin: 0; padding: 0; }
+#messages > li { 
+    padding: 8px 12px; 
+    margin-bottom: 10px;
+    border-radius: 15px;
+    max-width: 50%; /* Limite la largeur des bulles de message */
+    word-wrap: break-word; /* Empêche le débordement du texte */
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+   /* align-self: flex-start;  */ /* Supprimé pour permettre aux classes spécifiques de prendre le dessus */
+}
+.system-message { 
+    color: #888; 
+    font-style: italic; 
+    text-align: center; 
+    font-size: 0.9em; 
+    padding: 15px 0;
+    background-color: transparent; /* Les messages système n'ont pas de fond */
+    box-shadow: none;
+    max-width: 100%; /* S'assure qu'il prend toute la largeur disponible */
+    width: 100%; /* Force la largeur à 100% */
+    margin: 0 auto; /* Centre le message système */
+}
+.username { font-weight: bold; color: #3f51b5; margin-right: 5px; }
+
+/* Style pour les messages de l'émetteur */
+.my-message {
+    background-color: #e0f7fa; /* Bleu très clair */
+    align-self: flex-end; /* Aligne à droite */
+    text-align: right;
+    margin-left: auto; /* Pousse le message vers la droite */
+}
+.my-message .username {
+    color: #00796b; /* Couleur différente pour le nom d'utilisateur de l'émetteur */
+}
+
+/* Style pour les messages reçus */
+.received-message {
+    background-color: #f1f8e9; /* Vert très clair */
+    align-self: flex-start; /* Aligne à gauche */
+    text-align: left;
+}
+.received-message .username {
+    color: #33691e; /* Couleur différente pour le nom d'utilisateur du récepteur */
+}
+/* ---------------------------------------------------- */
+/* COLONNE LATÉRALE (SIDEBAR) */
+/* ---------------------------------------------------- */
+#user-sidebar {
+    grid-column: 2 / 3;
+    grid-row: 3 / 4; /* Occupe la troisième ligne */
+    background-color: #eceff1; /* Gris très clair */
+    border-left: 1px solid #ccc;
+    padding: 20px 15px;
+    overflow-y: auto;
+}
+
+#user-sidebar h3 {
+    color: #3f51b5;
+    font-size: 1.1rem;
+    margin-top: 0;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #ccc;
+    margin-bottom: 15px;
+}
+
+.user-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.user-item {
+    display: flex;
+    align-items: center;
+    padding: 10px;
+    margin-bottom: 5px;
+    background-color: white;
+    border-radius: 4px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+.user-item .avatar {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background-image: url('images/default_avatar.png'); /* Image par défaut */
+    background-size: cover; 
+    background-position: center;
+    background-color: #3f51b5;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: white;
+    font-weight: bold;
+    font-size: 0.9em;
+    margin-right: 10px;
+}
+
+/* Style spécifique pour l'utilisateur actuel (en haut de la sidebar) */
+#current-user-profile {
+    background-color: #ffffff;
+    border: 2px solid #3f51b5;
+    padding: 15px;
+    margin-bottom: 20px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+#current-user-profile .avatar {
+    width: 50px;
+    height: 50px;
+    font-size: 1.2em;
+    background-image: url('images/default_avatar_v1.png'); /* Image par défaut */
+    background-size: cover; 
+    background-position: center;
+}
+
+#current-user-profile span {
+    font-weight: bold;
+    color: #333;
+    font-size: 1.1rem;
+}
+
+/* ---------------------------------------------------- */
+/* MODAL DE CONFIRMATION */
+/* ---------------------------------------------------- */
+#confirmation-modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+}
+
+#confirmation-modal > div {
+    background: white;
+    padding: 25px;
+    border-radius: 8px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    max-width: 350px;
+    text-align: center;
+}
+
+#confirmation-modal p {
+    font-size: 1.1rem;
+    font-weight: 500;
+    margin-bottom: 0;
+}
+
+.modal-buttons button {
+    transition: background-color 0.2s;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    margin: 0 10px;
+}
+
+#confirm-quit {
+    background-color: #f44336;
+    color: white;
+}
+
+#confirm-quit:hover {
+    background-color: #d32f2f;
+}
+
+#cancel-quit {
+    background-color: #ccc;
+    color: #333;
+}
+
+#cancel-quit:hover {
+    background-color: #bbb;
+}
+
+/* Styles pour la modale de succès */
+#success-modal .modal-content {
+    background-color: #e8f5e9; /* Vert très clair */
+    border: 1px solid #a5d6a7; /* Bordure verte */
+    /* Réutilise les styles de base de .modal-content de profile-modal.html */
+    margin: auto;
+    padding: 20px;
+    width: 80%;
+    max-width: 500px;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    position: relative;
+    text-align: center; /* Centre le texte dans la modale de succès */
+}
+
+#success-modal-ok-button {
+    background-color: #4caf50; /* Vert */
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: bold;
+    transition: background-color 0.2s;
+    margin-top: 15px;
+}
+
+#success-modal-ok-button:hover {
+    background-color: #388e3c; /* Vert plus foncé au survol */
+}
