@@ -17,6 +17,7 @@ const adminRoutes = require('./src/routes/adminRoutes');
 const { csrfErrorHandler } = require('./src/middleware/csrfMiddleware');
 const UserModel = require('./src/models/UserModel');
 const LoginAttemptModel = require('./src/models/LoginAttemptModel');
+const MessageService = require('./src/services/MessageService');
 
 // --- Configuration du Serveur et de la Base de Données ---
 const PORT = config.port;
@@ -90,9 +91,10 @@ async function connectDB() {
             
             logger.info('Connexion à MongoDB réussie ! Base de données :', DB_NAME);
 
-            // Initialiser les modèles avec l'instance de la base de données
+            // Initialiser les modèles et services avec l'instance de la base de données
             UserModel.setDb(db);
             LoginAttemptModel.setDb(db);
+            MessageService.setDb(db);
 
             // Création des index pour la collection 'users'
             await db.collection(USERS_COLLECTION_NAME).createIndex({ username: 1 }, { unique: true });
@@ -158,54 +160,27 @@ function startServer() {
     connectedUsers.add(userId);
 
     logger.info(`Utilisateur connecté: ${userId} (${socket.id})`, { userId, socketId: socket.id, type: 'socket_connect' });
-
-    // Fonction utilitaire pour diffuser la liste des utilisateurs avec leurs photos de profil
-    const broadcastUserList = async () => {
-        try {
-            const connectedUserProfiles = await Promise.all(
-                Array.from(connectedUsers).map(async (username) => {
-                    return await UserModel.getUserProfileFromCacheOrDB(username);
-                })
-            );
-            io.emit('user list', connectedUserProfiles);
-        } catch (error) {
-            logger.error('Erreur lors de la diffusion de la liste des utilisateurs:', error);
-        }
-    };
     
     // 1. Envoyer l'historique des messages au nouvel utilisateur
     try {
-            // Tenter de récupérer l'historique des messages depuis Redis
-            let history = await redisClient.get('chat:history');
-            if (history) {
-                history = JSON.parse(history);
-                logger.debug('Historique des messages récupéré du cache Redis.');
-            } else {
-                logger.debug('Historique des messages non trouvé dans le cache, récupération depuis la DB.');
-                history = await db.collection(COLLECTION_NAME)
-                                    .find({})
-                                    .sort({ timestamp: 1 }) // Trier par timestamp croissant
-                                    .limit(100) 
-                                    .toArray();
-                await redisClient.set('chat:history', JSON.stringify(history), { EX: 600 }); // Cache pendant 10 minutes
-            }
-            socket.emit('history', history);
+        const history = await MessageService.getChatHistory();
+        socket.emit('history', history);
+    
+        // Annoncer la connexion à tout le monde
+        const systemJoinMsg = {
+            user: 'Système',
+            text: `${userId} a rejoint la discussion.`,
+            type: 'system',
+            timestamp: new Date()
+        };
+        io.emit('chat message', systemJoinMsg);
         
-            // Annoncer la connexion à tout le monde
-            const systemJoinMsg = {
-                user: 'Système',
-                text: `${userId} a rejoint la discussion.`,
-                type: 'system',
-                timestamp: new Date()
-            };
-            io.emit('chat message', systemJoinMsg);
-            
-        } catch (error) {
+    } catch (error) {
         logger.error('Erreur lors du chargement de l\'historique:', error);
     }
     
     // Mettre à jour et diffuser la liste des utilisateurs à tous
-    broadcastUserList();
+    MessageService.broadcastUserList(io, connectedUsers);
 
     // Envoyer l'objet utilisateur actuel au client pour affichage
     const currentUserProfile = await UserModel.getUserProfileFromCacheOrDB(user.username);
@@ -232,11 +207,7 @@ function startServer() {
         // Le serveur n'a pas besoin de savoir si la fenêtre est active ou non.
 
         // 3. Sauvegarder le message dans la base de données
-        try {
-            await db.collection(COLLECTION_NAME).insertOne(messageToSave);
-        } catch (error) {
-            logger.error('Erreur lors de la sauvegarde du message:', error);
-        }
+        await MessageService.saveMessage(messageToSave);
     });
 
     // 4. Gérer la déconnexion
@@ -257,7 +228,7 @@ function startServer() {
         io.emit('chat message', systemLeaveMsg);
         
         // Mettre à jour et diffuser la liste des utilisateurs
-        broadcastUserList();
+        MessageService.broadcastUserList(io, connectedUsers);
     });
 });
 
