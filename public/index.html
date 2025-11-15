@@ -16,7 +16,11 @@
       <!-- Barre Horizontale Supérieure -->
       <header id="chat-header">
         <div class="header-title">
-          <img src="images/img_logo_rambani_v0.png" alt="Logo Rambani" />
+          <img
+            src="images/img_logo_rambani_v0.png"
+            alt="Logo Rambani"
+            loading="lazy"
+          />
           <h1>Chat Privé</h1>
         </div>
         <div class="header-right">
@@ -542,7 +546,7 @@
         // Gérer l'événement de déconnexion forcée
         socket.on("force_disconnect", (message) => {
           showAlertModal(message, () => {
-            window.location.href = "/logout"; // Rediriger vers la page de déconnexion
+            window.location.href = "/auth/logout"; // Rediriger vers la page de déconnexion
           });
         });
 

@@ -137,6 +137,8 @@ async function connectDB() {
 
 // Middleware pour servir les fichiers statiques du dossier 'src/admin'
 app.use("/admin", express.static(path.join(__dirname, "src", "admin")));
+// Middleware pour servir les fichiers statiques du dossier 'src/assets'
+app.use("/assets", express.static(path.join(__dirname, "src", "assets")));
 
 // Utilisation des routes
 app.use("/auth", authRoutes); // Routes d'authentification
