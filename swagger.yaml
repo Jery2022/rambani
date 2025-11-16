@@ -1,0 +1,343 @@
+openapi: 3.0.0
+info:
+  title: API de Chat Rambani
+  version: 1.0.0
+  description: Documentation de l'API pour l'application de chat Rambani.
+servers:
+  - url: http://localhost:3000
+    description: Serveur de développement local
+tags:
+  - name: Authentification
+    description: Opérations liées à l'authentification des utilisateurs
+  - name: Utilisateurs
+    description: Opérations de gestion des utilisateurs
+  - name: Chat
+    description: Opérations de messagerie instantanée
+paths:
+  /auth/register:
+    post:
+      summary: Enregistrer un nouvel utilisateur
+      tags:
+        - Authentification
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - email
+                - password
+              properties:
+                username:
+                  type: string
+                  description: Nom d'utilisateur unique
+                  example: johndoe
+                email:
+                  type: string
+                  format: email
+                  description: Adresse e-mail de l'utilisateur
+                  example: john.doe@example.com
+                password:
+                  type: string
+                  format: password
+                  description: Mot de passe de l'utilisateur
+                  example: password123
+      responses:
+        "201":
+          description: Utilisateur enregistré avec succès
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Inscription réussie.
+        "400":
+          description: Requête invalide ou utilisateur déjà existant
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: L'utilisateur existe déjà ou les données sont invalides.
+  /auth/login:
+    post:
+      summary: Connecter un utilisateur
+      tags:
+        - Authentification
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - password
+              properties:
+                username:
+                  type: string
+                  description: Nom d'utilisateur
+                  example: johndoe
+                password:
+                  type: string
+                  format: password
+                  description: Mot de passe
+                  example: password123
+      responses:
+        "200":
+          description: Connexion réussie
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+                example: connect.sid=s%3A...; Path=/; HttpOnly; SameSite=Lax
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Connexion réussie.
+        "401":
+          description: Identifiants invalides
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Nom d'utilisateur ou mot de passe invalide.
+        "403":
+          description: Compte verrouillé
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Votre compte est verrouillé. Veuillez réessayer plus tard.
+  /auth/logout:
+    post:
+      summary: Déconnecter un utilisateur
+      tags:
+        - Authentification
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Déconnexion réussie
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Déconnexion réussie.
+        "401":
+          description: Non authentifié
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Non authentifié.
+  /api/profile:
+    get:
+      summary: Obtenir le profil de l'utilisateur connecté
+      tags:
+        - Utilisateurs
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Profil de l'utilisateur
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  username:
+                    type: string
+                    example: johndoe
+                  email:
+                    type: string
+                    example: john.doe@example.com
+                  profilePicture:
+                    type: string
+                    nullable: true
+                    example: /images/profile_pictures/johndoe.png
+        "401":
+          description: Non authentifié
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Non authentifié.
+    put:
+      summary: Mettre à jour le profil de l'utilisateur connecté
+      tags:
+        - Utilisateurs
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                  description: Nouveau nom d'utilisateur (optionnel)
+                  example: john_doe_new
+                email:
+                  type: string
+                  format: email
+                  description: Nouvelle adresse e-mail (optionnel)
+                  example: new.email@example.com
+                password:
+                  type: string
+                  format: password
+                  description: Nouveau mot de passe (optionnel)
+                  example: newpassword123
+                profilePicture:
+                  type: string
+                  format: binary
+                  description: Nouvelle photo de profil (fichier image)
+      responses:
+        "200":
+          description: Profil mis à jour avec succès
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Profil mis à jour avec succès.
+                  user:
+                    type: object
+                    properties:
+                      username:
+                        type: string
+                        example: john_doe_new
+                      email:
+                        type: string
+                        example: new.email@example.com
+                      profilePicture:
+                        type: string
+                        nullable: true
+                        example: /images/profile_pictures/john_doe_new.png
+        "400":
+          description: Requête invalide
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Données de mise à jour invalides.
+        "401":
+          description: Non authentifié
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Non authentifié.
+  /api/users:
+    get:
+      summary: Obtenir la liste de tous les utilisateurs
+      tags:
+        - Utilisateurs
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Liste des utilisateurs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    username:
+                      type: string
+                      example: user1
+                    profilePicture:
+                      type: string
+                      nullable: true
+                      example: /images/profile_pictures/user1.png
+        "401":
+          description: Non authentifié
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Non authentifié.
+  /api/messages/history:
+    get:
+      summary: Obtenir l'historique des messages du chat
+      tags:
+        - Chat
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Historique des messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    user:
+                      type: string
+                      example: johndoe
+                    text:
+                      type: string
+                      example: Bonjour à tous !
+                    timestamp:
+                      type: string
+                      format: date-time
+                      example: "2023-10-27T10:00:00Z"
+        "401":
+          description: Non authentifié
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Non authentifié.
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: connect.sid
+      description: Authentification par cookie de session Express

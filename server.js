@@ -19,6 +19,9 @@ const { csrfErrorHandler } = require("./src/middleware/csrfMiddleware");
 const UserModel = require("./src/models/UserModel");
 const LoginAttemptModel = require("./src/models/LoginAttemptModel");
 const MessageService = require("./src/services/MessageService");
+const swaggerUi = require("swagger-ui-express");
+const YAML = require("yamljs");
+const swaggerDocument = YAML.load("./swagger.yaml");
 
 // --- Configuration du Serveur et de la Base de Données ---
 const PORT = config.port;
@@ -276,6 +279,9 @@ async function startApplication() {
   app.use("/auth", authRoutes); // Routes d'authentification
   app.use("/api", apiRoutes); // Routes API
   app.use("/admin", adminRoutes); // Routes d'administration
+
+  // Servir la documentation Swagger
+  app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
   // Gestion des erreurs CSRF
   app.use(csrfErrorHandler);
