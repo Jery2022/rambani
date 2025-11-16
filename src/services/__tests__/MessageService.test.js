@@ -1,23 +1,15 @@
+// Unmock MessageService to test the real implementation
+jest.unmock("../../../src/services/MessageService");
+
+// Mock des dépendances
+jest.mock("../../../config/redisClient");
+jest.mock("../../models/UserModel");
+jest.mock("../../../config/logger");
+
 const MessageService = require("../MessageService");
 const redisClient = require("../../../config/redisClient");
 const UserModel = require("../../models/UserModel");
 const logger = require("../../../config/logger");
-
-// Mock des dépendances
-jest.mock("../../../config/redisClient", () => ({
-  get: jest.fn(),
-  set: jest.fn(),
-}));
-jest.mock("../../models/UserModel", () => ({
-  setDb: jest.fn(), // Ajout de setDb pour satisfaire jest.setup.js
-  getUserProfileFromCacheOrDB: jest.fn(),
-}));
-jest.mock("../../../config/logger", () => ({
-  debug: jest.fn(),
-  info: jest.fn(),
-  warn: jest.fn(),
-  error: jest.fn(),
-}));
 
 describe("MessageService", () => {
   let mockDb;
@@ -72,7 +64,7 @@ describe("MessageService", () => {
 
       expect(redisClient.get).toHaveBeenCalledWith("chat:history");
       expect(logger.debug).toHaveBeenCalledWith(
-        "Historique des messages non trouvé dans le cache, récupération depuis la DB."
+        "Historique des messages non trouvé dans le cache, tentative de récupération depuis la DB."
       );
       expect(mockDb.collection).toHaveBeenCalledWith("messages");
       expect(mockCollection.find).toHaveBeenCalledWith({});
@@ -88,14 +80,15 @@ describe("MessageService", () => {
     });
 
     it("devrait retourner un tableau vide en cas d'erreur", async () => {
-      const mockError = new Error("Redis error");
-      redisClient.get.mockRejectedValue(mockError);
+      const mockError = new Error("DB error");
+      redisClient.get.mockResolvedValue(null);
+      mockCollection.toArray.mockRejectedValue(mockError);
 
       const result = await MessageService.getChatHistory();
 
       expect(redisClient.get).toHaveBeenCalledWith("chat:history");
       expect(logger.error).toHaveBeenCalledWith(
-        "Erreur lors du chargement de l'historique des messages:",
+        "Erreur lors du chargement de l'historique des messages depuis la DB:",
         mockError
       );
       expect(result).toEqual([]);
