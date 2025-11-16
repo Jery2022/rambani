@@ -28,58 +28,12 @@ const COLLECTION_NAME = "messages"; // Collection pour les messages du chat
 const USERS_COLLECTION_NAME = "users"; // Collection pour les utilisateurs
 const LOGIN_ATTEMPTS_COLLECTION_NAME = "login_attempts"; // Collection pour les tentatives de connexion
 
-// --- Initialisation de l'application Express et du serveur HTTP ---
-const app = express();
-const httpServer = createServer(app);
-
-const io = new Server(httpServer, {
-  cors: {
-    origin: config.allowed_origins,
-    methods: ["GET", "POST", "PUT", "DELETE"],
-  },
-});
-
-// Stocker l'instance de Socket.IO dans l'application Express pour y accéder depuis les contrôleurs
-app.set("io", io);
-
-// Connecter le client Redis et configurer l'adaptateur Socket.IO
-(async () => {
-  const pubClient = redisClient.duplicate();
-  const subClient = redisClient.duplicate();
-
-  await Promise.all([pubClient.connect(), subClient.connect()]);
-  io.adapter(createAdapter(pubClient, subClient));
-  logger.info("Adaptateur Socket.IO Redis configuré.");
-})();
-
-// Middleware pour parser le JSON dans les requêtes
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// Utiliser le middleware de compression pour toutes les réponses HTTP
-app.use(compression());
-
-// Utiliser cookie-parser avant la session
-app.use(cookieParser());
-
-// Configuration de la session avec MongoStore (MongoDB)
-const sessionMiddleware = session({
-  store: MongoStore.create({ mongoUrl: MONGODB_URI }),
-  secret: config.session_secret,
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    secure: config.node_env === "production",
-    sameSite: "Lax",
-    httpOnly: true,
-    maxAge: 7 * 24 * 60 * 60 * 1000,
-  },
-});
-
-app.use(sessionMiddleware);
-
+let app;
+let httpServer;
+let io;
 let db; // Variable pour stocker l'objet de la base de données MongoDB
 let mongoClientInstance; // Variable pour stocker l'instance du client MongoDB
+let sessionMiddleware;
 
 // Utiliser un Set pour garantir l'unicité des IDs d'utilisateur connectés
 const connectedUsers = new Set();
@@ -134,19 +88,6 @@ async function connectDB() {
     process.exit(1);
   }
 }
-
-// Middleware pour servir les fichiers statiques du dossier 'src/admin'
-app.use("/admin", express.static(path.join(__dirname, "src", "admin")));
-// Middleware pour servir les fichiers statiques du dossier 'src/assets'
-app.use("/assets", express.static(path.join(__dirname, "src", "assets")));
-
-// Utilisation des routes
-app.use("/auth", authRoutes); // Routes d'authentification
-app.use("/api", apiRoutes); // Routes API
-app.use("/admin", adminRoutes); // Routes d'administration
-
-// Gestion des erreurs CSRF
-app.use(csrfErrorHandler);
 
 // Fonction pour démarrer le serveur Socket.IO
 function startServer() {
@@ -275,8 +216,86 @@ function startServer() {
   });
 }
 
-// Middleware pour servir les fichiers statiques depuis le dossier 'public' (déplacé après les routes)
-app.use(express.static(path.join(__dirname, "public")));
+async function startApplication() {
+  // --- Initialisation de l'application Express et du serveur HTTP ---
+  app = express();
+  httpServer = createServer(app);
 
-// Lancer le processus de connexion à la base de données au démarrage
-connectDB();
+  io = new Server(httpServer, {
+    cors: {
+      origin: config.allowed_origins,
+      methods: ["GET", "POST", "PUT", "DELETE"],
+    },
+  });
+
+  // Stocker l'instance de Socket.IO dans l'application Express pour y accéder depuis les contrôleurs
+  app.set("io", io);
+
+  // Connecter le client Redis et configurer l'adaptateur Socket.IO
+  (async () => {
+    const pubClient = redisClient.duplicate();
+    const subClient = redisClient.duplicate();
+
+    await Promise.all([pubClient.connect(), subClient.connect()]);
+    io.adapter(createAdapter(pubClient, subClient));
+    logger.info("Adaptateur Socket.IO Redis configuré.");
+  })();
+
+  // Middleware pour parser le JSON dans les requêtes
+  app.use(express.json());
+  app.use(express.urlencoded({ extended: true }));
+
+  // Utiliser le middleware de compression pour toutes les réponses HTTP
+  app.use(compression());
+
+  // Utiliser cookie-parser avant la session
+  app.use(cookieParser());
+
+  // Configuration de la session avec MongoStore (MongoDB)
+  sessionMiddleware = session({
+    store: MongoStore.create({ mongoUrl: MONGODB_URI }),
+    secret: config.session_secret,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: config.node_env === "production",
+      sameSite: "Lax",
+      httpOnly: true,
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    },
+  });
+
+  app.use(sessionMiddleware);
+
+  // Middleware pour servir les fichiers statiques du dossier 'src/admin'
+  app.use("/admin", express.static(path.join(__dirname, "src", "admin")));
+  // Middleware pour servir les fichiers statiques du dossier 'src/assets'
+  app.use("/assets", express.static(path.join(__dirname, "src", "assets")));
+
+  // Utilisation des routes
+  app.use("/auth", authRoutes); // Routes d'authentification
+  app.use("/api", apiRoutes); // Routes API
+  app.use("/admin", adminRoutes); // Routes d'administration
+
+  // Gestion des erreurs CSRF
+  app.use(csrfErrorHandler);
+
+  // Middleware pour servir les fichiers statiques depuis le dossier 'public' (déplacé après les routes)
+  app.use(express.static(path.join(__dirname, "public")));
+
+  // Lancer le processus de connexion à la base de données au démarrage
+  connectDB();
+}
+
+if (process.env.NODE_ENV !== "test") {
+  startApplication();
+}
+
+module.exports = {
+  app,
+  httpServer,
+  io,
+  mongoClientInstance,
+  redisClient,
+  connectDB,
+};

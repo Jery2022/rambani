@@ -7,7 +7,18 @@ const config = require("../../../config/environnement");
 
 // Mock des dépendances
 jest.mock("../../models/UserModel");
-jest.mock("../../models/LoginAttemptModel");
+jest.mock("../../models/LoginAttemptModel", () => {
+  const actualLoginAttemptModel = jest.requireActual(
+    "../../models/LoginAttemptModel"
+  );
+  return {
+    ...actualLoginAttemptModel, // Inclut la vraie implémentation de setDb
+    cleanOldAttempts: jest.fn(),
+    countFailedAttempts: jest.fn(),
+    create: jest.fn(),
+    deleteAttemptsByUsername: jest.fn(),
+  };
+});
 jest.mock("bcrypt");
 jest.mock("../../../config/logger");
 jest.mock("../../../config/environnement", () => ({

@@ -11,21 +11,34 @@ jest.mock("bcrypt", () => ({
   hash: jest.fn(),
   compare: jest.fn(),
 }));
-jest.mock("fs", () => ({
-  unlinkSync: jest.fn(),
-  existsSync: jest.fn(),
+jest.mock("fs", () => {
+  const originalFs = jest.requireActual("fs");
+  return {
+    ...originalFs,
+    unlinkSync: jest.fn(),
+    existsSync: jest.fn(),
+    mkdirSync: jest.fn(), // Ajout de mkdirSync
+  };
+});
+jest.mock("path", () => {
+  const originalPath = jest.requireActual("path");
+  return {
+    ...originalPath,
+    join: jest.fn((...args) => originalPath.join(...args)),
+    resolve: jest.fn((...args) => originalPath.resolve(...args)),
+    basename: jest.fn((p, ext) => {
+      const parts = p.split(/[/\\]/);
+      const filename = parts[parts.length - 1];
+      return ext ? filename.replace(ext, "") : filename;
+    }),
+  };
+});
+jest.mock("../../../config/logger", () => ({
+  debug: jest.fn(),
+  info: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
 }));
-jest.mock("path", () => ({
-  join: jest.fn((...args) => args.join("/")),
-  resolve: jest.fn((...args) => args.join("/")),
-  basename: jest.fn((p, ext) => {
-    // Ajout du mock pour path.basename
-    const parts = p.split(/[/\\]/);
-    const filename = parts[parts.length - 1];
-    return ext ? filename.replace(ext, "") : filename;
-  }),
-}));
-jest.mock("../../../config/logger");
 
 describe("UserService", () => {
   beforeEach(() => {
@@ -118,9 +131,6 @@ describe("UserService", () => {
         profilePicture: "/images/profile_pictures/old_pic.png",
       });
       fs.existsSync.mockReturnValue(true);
-      path.join.mockReturnValueOnce(
-        "public/images/profile_pictures/old_pic.png"
-      ); // Mock spécifique pour ce test
       UserModel.update.mockResolvedValue({ matchedCount: 1 });
 
       const result = await UserService.updateUserProfile(
@@ -130,9 +140,14 @@ describe("UserService", () => {
       );
 
       expect(UserModel.findById).toHaveBeenCalledWith(mockUserId);
-      expect(fs.unlinkSync).toHaveBeenCalledWith(
-        "public/images/profile_pictures/old_pic.png"
+      const expectedOldImagePath = path.join(
+        process.cwd(),
+        "public",
+        "images",
+        "profile_pictures",
+        "old_pic.png"
       );
+      expect(fs.unlinkSync).toHaveBeenCalledWith(expectedOldImagePath);
       expect(UserModel.update).toHaveBeenCalledWith(
         mockUserId,
         expect.objectContaining({
@@ -297,11 +312,11 @@ describe("UserService", () => {
 
   describe("deleteUser", () => {
     it("devrait supprimer un utilisateur avec succès", async () => {
-      UserModel.delete = jest.fn().mockResolvedValue({ deletedCount: 1 });
+      UserModel.deleteUser.mockResolvedValue({ deletedCount: 1 });
 
       const result = await UserService.deleteUser("userId1");
 
-      expect(UserModel.delete).toHaveBeenCalledWith("userId1");
+      expect(UserModel.deleteUser).toHaveBeenCalledWith("userId1");
       expect(result).toEqual({
         success: true,
         status: 200,
@@ -310,11 +325,11 @@ describe("UserService", () => {
     });
 
     it("devrait retourner une erreur si l'utilisateur n'est pas trouvé", async () => {
-      UserModel.delete = jest.fn().mockResolvedValue({ deletedCount: 0 });
+      UserModel.deleteUser.mockResolvedValue({ deletedCount: 0 });
 
       const result = await UserService.deleteUser("nonExistentId");
 
-      expect(UserModel.delete).toHaveBeenCalledWith("nonExistentId");
+      expect(UserModel.deleteUser).toHaveBeenCalledWith("nonExistentId");
       expect(result).toEqual({
         success: false,
         status: 404,

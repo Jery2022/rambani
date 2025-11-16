@@ -4,7 +4,7 @@
   "description": "Application de Chat",
   "main": "server.js",
   "scripts": {
-    "test": "jest --setupFiles ./jest.setup.js",
+    "test": "set NODE_ENV=test && jest",
     "dev": "set NODE_ENV=development && nodemon server.js",
     "staging": "set NODE_ENV=staging && node server.js",
     "prod": "set NODE_ENV=production && node server.js",

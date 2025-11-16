@@ -4,9 +4,20 @@ const UserModel = require("../../models/UserModel");
 const logger = require("../../../config/logger");
 
 // Mock des dépendances
-jest.mock("../../../config/redisClient");
-jest.mock("../../models/UserModel");
-jest.mock("../../../config/logger");
+jest.mock("../../../config/redisClient", () => ({
+  get: jest.fn(),
+  set: jest.fn(),
+}));
+jest.mock("../../models/UserModel", () => ({
+  setDb: jest.fn(), // Ajout de setDb pour satisfaire jest.setup.js
+  getUserProfileFromCacheOrDB: jest.fn(),
+}));
+jest.mock("../../../config/logger", () => ({
+  debug: jest.fn(),
+  info: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+}));
 
 describe("MessageService", () => {
   let mockDb;
@@ -14,12 +25,21 @@ describe("MessageService", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    // Réinitialiser les mocks de redisClient, UserModel et logger
+    redisClient.get.mockClear();
+    redisClient.set.mockClear();
+    UserModel.getUserProfileFromCacheOrDB.mockClear();
+    logger.debug.mockClear();
+    logger.info.mockClear();
+    logger.warn.mockClear();
+    logger.error.mockClear();
+
     mockCollection = {
       find: jest.fn().mockReturnThis(),
       sort: jest.fn().mockReturnThis(),
       limit: jest.fn().mockReturnThis(),
       toArray: jest.fn(),
-      insertOne: jest.fn(),
+      insertOne: jest.fn().mockResolvedValue({}), // Mock insertOne pour retourner une promesse résolue
     };
     mockDb = {
       collection: jest.fn(() => mockCollection),
@@ -79,6 +99,33 @@ describe("MessageService", () => {
         mockError
       );
       expect(result).toEqual([]);
+    });
+
+    it("devrait récupérer l'historique de la DB si la récupération du cache Redis échoue", async () => {
+      const mockHistory = [{ text: "Hello from DB after Redis error" }];
+      const mockRedisError = new Error("Redis connection error");
+      redisClient.get.mockRejectedValue(mockRedisError);
+      mockCollection.toArray.mockResolvedValue(mockHistory);
+      redisClient.set.mockResolvedValue("OK");
+
+      const result = await MessageService.getChatHistory();
+
+      expect(redisClient.get).toHaveBeenCalledWith("chat:history");
+      expect(logger.warn).toHaveBeenCalledWith(
+        "Erreur lors de la récupération de l'historique depuis Redis, tentative de récupération depuis la DB:",
+        mockRedisError
+      );
+      expect(mockDb.collection).toHaveBeenCalledWith("messages");
+      expect(mockCollection.find).toHaveBeenCalledWith({});
+      expect(mockCollection.sort).toHaveBeenCalledWith({ timestamp: 1 });
+      expect(mockCollection.limit).toHaveBeenCalledWith(100);
+      expect(mockCollection.toArray).toHaveBeenCalled();
+      expect(redisClient.set).toHaveBeenCalledWith(
+        "chat:history",
+        JSON.stringify(mockHistory),
+        { EX: 600 }
+      );
+      expect(result).toEqual(mockHistory);
     });
   });
 
@@ -147,7 +194,10 @@ describe("MessageService", () => {
       const connectedUsers = new Set(["user1"]);
       const mockError = new Error("Broadcast error");
 
-      UserModel.getUserProfileFromCacheOrDB.mockRejectedValue(mockError);
+      // Utiliser mockImplementation pour retourner une promesse rejetée explicitement
+      UserModel.getUserProfileFromCacheOrDB.mockImplementation(() => {
+        return Promise.reject(mockError);
+      });
 
       await MessageService.broadcastUserList(mockIo, connectedUsers);
 
