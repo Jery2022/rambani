@@ -16,6 +16,7 @@ const authRoutes = require("./src/routes/authRoutes");
 const apiRoutes = require("./src/routes/apiRoutes");
 const adminRoutes = require("./src/routes/adminRoutes");
 const { csrfErrorHandler } = require("./src/middleware/csrfMiddleware");
+const { errorHandler } = require("./src/middleware/errorHandler"); // Importation du middleware de gestion d'erreurs
 const UserModel = require("./src/models/UserModel");
 const LoginAttemptModel = require("./src/models/LoginAttemptModel");
 const MessageService = require("./src/services/MessageService");
@@ -288,6 +289,9 @@ async function startApplication() {
 
   // Middleware pour servir les fichiers statiques depuis le dossier 'public' (déplacé après les routes)
   app.use(express.static(path.join(__dirname, "public")));
+
+  // Middleware de gestion d'erreurs centralisé (DOIT être le dernier middleware)
+  app.use(errorHandler);
 
   // Lancer le processus de connexion à la base de données au démarrage
   connectDB();

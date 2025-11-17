@@ -1,6 +1,8 @@
 const logger = require("../../config/logger");
 const redisClient = require("../../config/redisClient");
 const UserModel = require("../models/UserModel");
+const { AppError } = require("../middleware/errorHandler");
+const errorCodes = require("../utils/errorCodes");
 
 let dbInstance;
 const COLLECTION_NAME = "messages";
@@ -18,16 +20,16 @@ class MessageService {
         history = JSON.parse(cachedHistory);
         logger.debug("Historique des messages récupéré du cache Redis.");
         return history;
-      } else {
-        logger.debug(
-          "Historique des messages non trouvé dans le cache, tentative de récupération depuis la DB."
-        );
       }
+      logger.debug(
+        "Historique des messages non trouvé dans le cache, tentative de récupération depuis la DB."
+      );
     } catch (redisError) {
       logger.warn(
         "Erreur lors de la récupération de l'historique depuis Redis, tentative de récupération depuis la DB:",
         redisError
       );
+      // Continuer à essayer de récupérer depuis la DB même si Redis échoue
     }
 
     try {
@@ -37,7 +39,6 @@ class MessageService {
         .sort({ timestamp: 1 })
         .limit(100)
         .toArray();
-      // Tenter de mettre en cache même si la récupération Redis initiale a échoué
       if (history.length > 0) {
         await redisClient.set("chat:history", JSON.stringify(history), {
           EX: 600,
@@ -50,7 +51,10 @@ class MessageService {
         "Erreur lors du chargement de l'historique des messages depuis la DB:",
         dbError
       );
-      return [];
+      throw new AppError(
+        errorCodes.UNKNOWN_ERROR,
+        "Échec du chargement de l'historique des messages."
+      );
     }
   }
 
@@ -59,6 +63,10 @@ class MessageService {
       await dbInstance.collection(COLLECTION_NAME).insertOne(message);
     } catch (error) {
       logger.error("Erreur lors de la sauvegarde du message:", error);
+      throw new AppError(
+        errorCodes.MESSAGE_SEND_FAILED,
+        "Échec de la sauvegarde du message."
+      );
     }
   }
 
@@ -74,6 +82,10 @@ class MessageService {
       logger.error(
         "Erreur lors de la diffusion de la liste des utilisateurs:",
         error
+      );
+      throw new AppError(
+        errorCodes.UNKNOWN_ERROR,
+        "Échec de la diffusion de la liste des utilisateurs."
       );
     }
   }

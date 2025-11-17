@@ -4,18 +4,19 @@ const path = require("path");
 const bcrypt = require("bcrypt");
 const logger = require("../../config/logger");
 const UserModel = require("../models/UserModel");
+const { AppError } = require("../middleware/errorHandler");
+const errorCodes = require("../utils/errorCodes");
 
 class UserService {
   static async getUserProfile(userId) {
     const user = await UserModel.findById(userId, { password: 0, role: 0 });
     if (!user) {
-      return {
-        success: false,
-        status: 404,
-        message: "Profil utilisateur non trouvé.",
-      };
+      throw new AppError(
+        errorCodes.USER_NOT_FOUND,
+        "Profil utilisateur non trouvé."
+      );
     }
-    return { success: true, status: 200, profile: user };
+    return { success: true, statusCode: 200, profile: user };
   }
 
   static async updateUserProfile(userId, updateData, file) {
@@ -30,11 +31,10 @@ class UserService {
     );
     if (existingUserByUsername) {
       if (file) fs.unlinkSync(file.path);
-      return {
-        success: false,
-        status: 409,
-        message: "Ce nom d'utilisateur est déjà pris.",
-      };
+      throw new AppError(
+        errorCodes.AUTH_USERNAME_TAKEN,
+        "Ce nom d'utilisateur est déjà pris."
+      );
     }
 
     // Vérifier si l'email est déjà pris par un autre utilisateur
@@ -44,11 +44,10 @@ class UserService {
     );
     if (existingUserByEmail) {
       if (file) fs.unlinkSync(file.path);
-      return {
-        success: false,
-        status: 409,
-        message: "Cet email est déjà utilisé par un autre utilisateur.",
-      };
+      throw new AppError(
+        errorCodes.AUTH_EMAIL_TAKEN,
+        "Cet email est déjà utilisé par un autre utilisateur."
+      );
     }
 
     const finalUpdateData = {
@@ -83,16 +82,12 @@ class UserService {
 
     if (result.matchedCount === 0) {
       if (file) fs.unlinkSync(file.path);
-      return {
-        success: false,
-        status: 404,
-        message: "Utilisateur non trouvé.",
-      };
+      throw new AppError(errorCodes.USER_NOT_FOUND, "Utilisateur non trouvé.");
     }
 
     return {
       success: true,
-      status: 200,
+      statusCode: 200,
       message: "Profil mis à jour avec succès.",
       updatedData: finalUpdateData,
     };
@@ -100,28 +95,20 @@ class UserService {
 
   static async getUsers() {
     const users = await UserModel.findAll({ password: 0 });
-    return { success: true, status: 200, users };
+    return { success: true, statusCode: 200, users };
   }
 
   static async createUser(username, password, email, role) {
     // Vérifier l'unicité du pseudo
     const existingUserByUsername = await UserModel.findByUsername(username);
     if (existingUserByUsername) {
-      return {
-        success: false,
-        status: 409,
-        message: "Ce pseudo est déjà pris.",
-      };
+      throw new AppError(errorCodes.AUTH_USERNAME_TAKEN);
     }
 
     // Vérifier l'unicité de l'email
     const existingUserByEmail = await UserModel.findByEmail(email);
     if (existingUserByEmail) {
-      return {
-        success: false,
-        status: 409,
-        message: "Cet email est déjà utilisé.",
-      };
+      throw new AppError(errorCodes.AUTH_EMAIL_TAKEN);
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -129,7 +116,7 @@ class UserService {
 
     return {
       success: true,
-      status: 201,
+      statusCode: 201,
       message: "Utilisateur enregistré avec succès.",
     };
   }
@@ -137,15 +124,11 @@ class UserService {
   static async deleteUser(id) {
     const result = await UserModel.deleteUser(id);
     if (result.deletedCount === 0) {
-      return {
-        success: false,
-        status: 404,
-        message: "Utilisateur non trouvé.",
-      };
+      throw new AppError(errorCodes.USER_NOT_FOUND, "Utilisateur non trouvé.");
     }
     return {
       success: true,
-      status: 200,
+      statusCode: 200,
       message: "Utilisateur supprimé avec succès.",
     };
   }
@@ -154,14 +137,10 @@ class UserService {
     const user = await UserModel.findById(id, { password: 0 });
     if (!user) {
       logger.info(`Serveur: Utilisateur non trouvé pour l'ID: ${id}`);
-      return {
-        success: false,
-        status: 404,
-        message: "Utilisateur non trouvé.",
-      };
+      throw new AppError(errorCodes.USER_NOT_FOUND, "Utilisateur non trouvé.");
     }
     logger.debug(`Serveur: Utilisateur trouvé: ${user.username}`);
-    return { success: true, status: 200, user };
+    return { success: true, statusCode: 200, user };
   }
 
   static async updateUser(id, updateData) {
@@ -173,11 +152,10 @@ class UserService {
       id
     );
     if (existingUserByUsername) {
-      return {
-        success: false,
-        status: 409,
-        message: "Ce pseudo est déjà pris par un autre utilisateur.",
-      };
+      throw new AppError(
+        errorCodes.AUTH_USERNAME_TAKEN,
+        "Ce pseudo est déjà pris par un autre utilisateur."
+      );
     }
 
     // Vérifier si l'email est déjà pris par un autre utilisateur
@@ -186,11 +164,10 @@ class UserService {
       id
     );
     if (existingUserByEmail) {
-      return {
-        success: false,
-        status: 409,
-        message: "Cet email est déjà utilisé par un autre utilisateur.",
-      };
+      throw new AppError(
+        errorCodes.AUTH_EMAIL_TAKEN,
+        "Cet email est déjà utilisé par un autre utilisateur."
+      );
     }
 
     const finalUpdateData = { username, email, role };
@@ -202,16 +179,12 @@ class UserService {
     const result = await UserModel.update(id, finalUpdateData);
 
     if (result.matchedCount === 0) {
-      return {
-        success: false,
-        status: 404,
-        message: "Utilisateur non trouvé.",
-      };
+      throw new AppError(errorCodes.USER_NOT_FOUND, "Utilisateur non trouvé.");
     }
 
     return {
       success: true,
-      status: 200,
+      statusCode: 200,
       message: "Utilisateur mis à jour avec succès.",
     };
   }
