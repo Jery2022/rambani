@@ -1,13 +1,14 @@
 node_modules/
 NoSQL/
 logs/
+task_history/
+dist/
 .DS_Store
 .env
 .env.development
 .env.production
 .env.staging
 .env.test
-dist/
 coverage
 npm-debug.log*
 yarn-debug.log*
