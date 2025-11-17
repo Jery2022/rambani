@@ -8,7 +8,8 @@
     "dev": "set NODE_ENV=development && nodemon server.js",
     "staging": "set NODE_ENV=staging && node server.js",
     "prod": "set NODE_ENV=production && node server.js",
-    "start": "node server.js"
+    "start": "pm2 start ecosystem.config.js --env production",
+    "dev:pm2": "pm2 start ecosystem.config.js --env development"
   },
   "keywords": [],
   "author": "Nova Technologies sarl",
@@ -30,6 +31,7 @@
     "mongodb-memory-server": "^10.3.0",
     "mongoose": "^8.19.3",
     "multer": "^2.0.2",
+    "pm2": "^6.0.13",
     "redis": "^5.9.0",
     "socket.io": "^4.8.1",
     "supertest": "^7.1.4",

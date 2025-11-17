@@ -225,6 +225,11 @@ async function startApplication() {
   app = express();
   httpServer = createServer(app);
 
+  // Health check endpoint
+  app.get("/health", (req, res) => {
+    res.status(200).send("OK");
+  });
+
   io = new Server(httpServer, {
     cors: {
       origin: config.allowed_origins,
