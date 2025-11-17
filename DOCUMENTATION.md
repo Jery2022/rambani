@@ -304,6 +304,209 @@ Assurez-vous que `MONGODB_URI`, `SESSION_SECRET`, `JWT_SECRET` et `REDIS_URI` so
   pm2 startup
   ```
 
+### 7.5. Déploiement avec Docker
+
+Pour déployer l'application en utilisant des conteneurs Docker, suivez ces étapes :
+
+#### 7.5.1. Prérequis Docker
+
+- **Docker Engine** : Installé et en cours d'exécution sur votre serveur.
+- **Docker Compose** (recommandé pour les déploiements multi-services, par exemple avec MongoDB et Redis).
+
+#### 7.5.2. Fichiers Docker
+
+- **`Dockerfile`** : Définit l'image Docker de l'application.
+
+  ```dockerfile
+  # Utiliser une image Node.js officielle comme base
+  FROM node:18-alpine
+
+  # Définir le répertoire de travail dans le conteneur
+  WORKDIR /app
+
+  # Copier package.json et package-lock.json pour installer les dépendances
+  COPY --chown=node:node package*.json ./
+
+  # Installer les dépendances de production
+  RUN npm install --production
+
+  # Copier le reste du code source de l'application
+  COPY --chown=node:node . .
+
+  # Exposer le port sur lequel l'application s'exécute
+  EXPOSE 3000
+
+  # Définir l'utilisateur non-root
+  USER node
+
+  # Commande pour démarrer l'application en production
+  CMD ["node", "server.js"]
+  ```
+
+- **`.dockerignore`** : Spécifie les fichiers et dossiers à ignorer lors de la construction de l'image Docker.
+  ```
+  node_modules
+  npm-debug.log
+  .env
+  .git
+  .gitignore
+  Dockerfile
+  README.md
+  .vscode/
+  logs/
+  TESTS.md
+  jest.config.js
+  jest.setup.js
+  loadtest.js
+  minify.js
+  hash_pwd.js
+  ```
+
+#### 7.5.3. Étapes de Déploiement Docker
+
+1.  **Cloner le dépôt** (si ce n'est pas déjà fait) :
+
+    ```bash
+    git clone https://github.com/Jery2022/rambani.git
+    cd rambani
+    ```
+
+2.  **Créer le fichier `.env`** :
+    Assurez-vous d'avoir un fichier `.env` configuré comme décrit dans la section 7.2, avec les variables d'environnement pour la production.
+
+3.  **Construire l'image Docker** :
+    Naviguez vers le répertoire racine de votre projet où se trouvent le `Dockerfile` et le `.dockerignore`.
+
+    ```bash
+    docker build -t rambani-chat-app .
+    ```
+
+    Le tag `-t rambani-chat-app` nomme votre image.
+
+4.  **Exécuter le conteneur Docker** :
+
+    ```bash
+    docker run -d --name rambani-instance -p 3000:3000 --env-file ./.env rambani-chat-app
+    ```
+
+    - `-d` : Détache le conteneur (l'exécute en arrière-plan).
+    - `--name rambani-instance` : Donne un nom à votre conteneur.
+    - `-p 3000:3000` : Mappe le port 3000 du conteneur au port 3000 de la machine hôte.
+    - `--env-file ./.env` : Charge les variables d'environnement depuis votre fichier `.env`.
+
+5.  **Vérifier le statut du conteneur** :
+
+    ```bash
+    docker ps
+    ```
+
+    Vous devriez voir votre conteneur `rambani-instance` listé avec le statut `Up`.
+
+6.  **Accéder aux logs du conteneur** :
+
+    ```bash
+    docker logs rambani-instance
+    ```
+
+7.  **Arrêter et supprimer le conteneur** :
+    ```bash
+    docker stop rambani-instance
+    docker rm rambani-instance
+    ```
+
+#### 7.5.4. Utilisation avec Docker Compose (Recommandé pour les services multiples)
+
+Pour gérer l'application avec ses dépendances (MongoDB, Redis) dans des conteneurs séparés, utilisez Docker Compose.
+
+1.  **Créez un fichier `docker-compose.yml`** à la racine de votre projet :
+
+    ```yaml
+    version: "3.8"
+
+    services:
+      app:
+        build:
+          context: .
+          dockerfile: Dockerfile
+        container_name: rambani-app
+        restart: always
+        ports:
+          - "3000:3000"
+        env_file:
+          - ./.env
+        depends_on:
+          - mongo
+          - redis
+        networks:
+          - rambani-network
+
+      mongo:
+        image: mongo:4.4
+        container_name: rambani-mongo
+        restart: always
+        ports:
+          - "27017:27017"
+        environment:
+          MONGO_INITDB_ROOT_USERNAME: ${MONGODB_USER}
+          MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_PASSWORD}
+          MONGO_INITDB_DATABASE: ${DB_NAME}
+        volumes:
+          - mongo_data:/data/db
+        networks:
+          - rambani-network
+
+      redis:
+        image: redis:6-alpine
+        container_name: rambani-redis
+        restart: always
+        ports:
+          - "6379:6379"
+        volumes:
+          - redis_data:/data
+        networks:
+          - rambani-network
+
+    volumes:
+      mongo_data:
+      redis_data:
+
+    networks:
+      rambani-network:
+        driver: bridge
+    ```
+
+2.  **Mettez à jour votre fichier `.env`** avec les variables pour MongoDB et Redis si vous utilisez Docker Compose :
+
+    ```
+    # ... (variables existantes) ...
+
+    # Variables pour Docker Compose MongoDB
+    MONGODB_USER=your_mongo_user
+    MONGODB_PASSWORD=your_mongo_password
+    DB_NAME=chat_db
+
+    # Mettez à jour MONGODB_URI et REDIS_URI pour qu'ils pointent vers les services Docker Compose
+    MONGODB_URI=mongodb://${MONGODB_USER}:${MONGODB_PASSWORD}@mongo:27017/${DB_NAME}?authSource=admin
+    REDIS_URI=redis://redis:6379
+    ```
+
+    **Important** : Dans le `MONGODB_URI` et `REDIS_URI` du fichier `.env`, utilisez les noms des services définis dans `docker-compose.yml` (`mongo` et `redis`) comme hôtes, car ils seront sur le même réseau Docker.
+
+3.  **Démarrez l'application avec Docker Compose** :
+
+    ```bash
+    docker-compose up -d --build
+    ```
+
+    - `up` : Crée et démarre les conteneurs.
+    - `-d` : Détache les conteneurs.
+    - `--build` : Reconstruit l'image de l'application si des changements ont été faits.
+
+4.  **Arrêter et supprimer les services Docker Compose** :
+    ```bash
+    docker-compose down
+    ```
+
 ## 8. Tests
 
 Le dossier `src/services/__tests__/` contient des tests unitaires pour les services, utilisant Jest ainsi qu'un test d'intégration pour l'utilisation des APIs.
