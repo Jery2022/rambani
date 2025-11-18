@@ -1,0 +1,15 @@
+node_modules
+npm-debug.log
+.env
+.git
+.gitignore
+Dockerfile
+README.md
+.vscode/
+logs/
+TESTS.md
+jest.config.js
+jest.setup.js
+loadtest.js
+minify.js
+hash_pwd.js
